@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proveedores - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="categorias.html"><i>📁</i> Categorías</a>
+            <a href="proveedores.html" class="active"><i>🏢</i> Proveedores</a>
+            <a href="clientes.html"><i>👥</i> Clientes</a>
+            <a href="usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="productos.html"><i>📦</i> Productos</a>
+            <a href="ventas.html"><i>💰</i> Ventas</a>
+            <a href="reportes.html"><i>📈</i> Reportes</a>
+            <a href="api.html"><i>🔧</i> API Docs</a>
+        </div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>🏢 Proveedores</h1>
+            <p>Gestión de proveedores</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Lista de Proveedores</h3>
+                <div class="card-actions">
+                    <input type="text" id="search-proveedor" placeholder="Buscar..." oninput="searchProveedores()">
+                    <button class="btn btn-primary" onclick="openProveedorModal()">
+                        ➕ Nuevo Proveedor
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="proveedores-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Contacto</th>
+                                <th>Teléfono</th>
+                                <th>Email</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="proveedores-tbody">
+                            <tr>
+                                <td colspan="8" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Modal Nuevo/Editar Proveedor -->
+    <div id="proveedor-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="proveedor-modal-title">Nuevo Proveedor</h3>
+                <button class="modal-close" onclick="closeModal('proveedor-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="proveedor-form">
+                    <input type="hidden" id="proveedor-id">
+                    
+                    <div class="form-group">
+                        <label for="proveedor-nombre">Nombre *</label>
+                        <input type="text" id="proveedor-nombre" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="proveedor-contacto">Contacto</label>
+                            <input type="text" id="proveedor-contacto">
+                        </div>
+                        <div class="form-group">
+                            <label for="proveedor-telefono">Teléfono</label>
+                            <input type="text" id="proveedor-telefono">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="proveedor-email">Email</label>
+                        <input type="email" id="proveedor-email">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="proveedor-direccion">Dirección</label>
+                        <textarea id="proveedor-direccion" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('proveedor-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveProveedor()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/proveedores.js"></script>
+</body>
+</html>

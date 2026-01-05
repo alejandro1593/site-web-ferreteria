@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productos - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="categorias.html"><i>📁</i> Categorías</a>
+            <a href="proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="clientes.html"><i>👥</i> Clientes</a>
+            <a href="usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="productos.html" class="active"><i>📦</i> Productos</a>
+            <a href="ventas.html"><i>💰</i> Ventas</a>
+            <a href="reportes.html"><i>📈</i> Reportes</a>
+            <a href="api.html"><i>🔧</i> API Docs</a>
+        </div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>📦 Productos</h1>
+            <p>Gestión de productos del inventario</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Inventario de Productos</h3>
+                <div class="card-actions">
+                    <select id="filter-categoria" onchange="filterProductos()">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                    <input type="text" id="search-producto" placeholder="Buscar productos..." oninput="searchProductos()">
+                    <button class="btn btn-primary" onclick="openProductoModal()">
+                        ➕ Nuevo Producto
+                    </button>
+                    <button class="btn btn-warning" onclick="loadLowStock()">
+                        ⚠️ Stock Bajo
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="productos-container" class="products-grid">
+                    <div class="loading-spinner">Cargando productos...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Modal Nuevo/Editar Producto -->
+    <div id="producto-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="producto-modal-title">Nuevo Producto</h3>
+                <button class="modal-close" onclick="closeModal('producto-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="producto-form">
+                    <input type="hidden" id="producto-id">
+                    
+                    <div class="form-group">
+                        <label for="producto-nombre">Nombre *</label>
+                        <input type="text" id="producto-nombre" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="producto-codigo">Código</label>
+                            <input type="text" id="producto-codigo">
+                        </div>
+                        <div class="form-group">
+                            <label for="producto-categoria">Categoría</label>
+                            <select id="producto-categoria" required></select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="producto-precio-compra">Precio Compra</label>
+                            <input type="number" id="producto-precio-compra" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="producto-precio-venta">Precio Venta *</label>
+                            <input type="number" id="producto-precio-venta" step="0.01" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="producto-stock-actual">Stock Actual</label>
+                            <input type="number" id="producto-stock-actual" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="producto-stock-minimo">Stock Mínimo</label>
+                            <input type="number" id="producto-stock-minimo" value="0">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="producto-proveedor">Proveedor</label>
+                            <select id="producto-proveedor"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="producto-activo">Estado</label>
+                            <select id="producto-activo">
+                                <option value="true">Activo</option>
+                                <option value="false">Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="producto-descripcion">Descripción</label>
+                        <textarea id="producto-descripcion" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('producto-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveProducto()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/productos.js"></script>
+</body>
+</html>

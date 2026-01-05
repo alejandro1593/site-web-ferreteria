@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Ferretería - Documentación Interactiva</title>
+    <link rel="stylesheet" href="/static/css/api.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 API Sistema de Ferretería</h1>
+            <p>Documentación interactiva de todos los endpoints disponibles</p>
+        </div>
+        
+        <div class="nav-links">
+            <a href="#categorias">Categorías</a>
+            <a href="#proveedores">Proveedores</a>
+            <a href="#clientes">Clientes</a>
+            <a href="#usuarios">Usuarios</a>
+            <a href="#productos">Productos</a>
+            <a href="#ventas">Ventas</a>
+            <a href="#detalles">Detalles de Venta</a>
+        </div>
+        
+        <div class="content">
+            <div class="info-box">
+                <h4>📝 Información Importante</h4>
+                <ul>
+                    <li><strong>Base URL:</strong> http://localhost:3000</li>
+                    <li><strong>Formato de respuesta:</strong> JSON</li>
+                    <li><strong>Estado del servidor:</strong> <span id="server-status">Verificando...</span></li>
+                </ul>
+            </div>
+            
+            <!-- Categorías -->
+            <div class="endpoint-group" id="categorias">
+                <h2>📁 Categorías</h2>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/categorias</span>
+                    <p class="endpoint-description">Obtener todas las categorías</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/categorias')">🚀 Probar</button>
+                    <div class="response-area" id="response-1"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/categorias/:id</span>
+                    <p class="endpoint-description">Obtener una categoría por ID</p>
+                    <div class="endpoint-example">
+                        <h4>Ejemplo:</h4>
+                        <div class="code-block">GET /api/categorias/1</div>
+                    </div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-url">/api/categorias</span>
+                    <p class="endpoint-description">Crear nueva categoría</p>
+                    <div class="endpoint-example">
+                        <h4>Body:</h4>
+                        <div class="code-block">{
+  "nombre": "Herramientas manuales",
+  "descripcion": "Herramientas de mano para construcción y hogar"
+}</div>
+                    </div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method put">PUT</span>
+                    <span class="endpoint-url">/api/categorias/:id</span>
+                    <p class="endpoint-description">Actualizar categoría</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method delete">DELETE</span>
+                    <span class="endpoint-url">/api/categorias/:id</span>
+                    <p class="endpoint-description">Eliminar categoría</p>
+                </div>
+            </div>
+            
+            <!-- Proveedores -->
+            <div class="endpoint-group" id="proveedores">
+                <h2>🏢 Proveedores</h2>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/proveedores</span>
+                    <p class="endpoint-description">Obtener todos los proveedores</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/proveedores')">🚀 Probar</button>
+                    <div class="response-area" id="response-2"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/proveedores/search?nombre=Juan</span>
+                    <p class="endpoint-description">Buscar proveedor por nombre</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-url">/api/proveedores</span>
+                    <p class="endpoint-description">Crear nuevo proveedor</p>
+                    <div class="endpoint-example">
+                        <h4>Body:</h4>
+                        <div class="code-block">{
+  "nombre": "Constructora Pérez",
+  "contacto": "Juan Pérez",
+  "telefono": "555-0101",
+  "email": "juan@perez.com",
+  "direccion": "Av. Industrial 123"
+}</div>
+                    </div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method put">PUT</span>
+                    <span class="endpoint-url">/api/proveedores/:id</span>
+                    <p class="endpoint-description">Actualizar proveedor</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method delete">DELETE</span>
+                    <span class="endpoint-url">/api/proveedores/:id</span>
+                    <p class="endpoint-description">Eliminar proveedor</p>
+                </div>
+            </div>
+            
+            <!-- Clientes -->
+            <div class="endpoint-group" id="clientes">
+                <h2>👥 Clientes</h2>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/clientes</span>
+                    <p class="endpoint-description">Obtener todos los clientes</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/clientes')">🚀 Probar</button>
+                    <div class="response-area" id="response-3"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/clientes/search?termino=Juan</span>
+                    <p class="endpoint-description">Buscar cliente por nombre, apellido o DNI</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/clientes/dni/:dni</span>
+                    <p class="endpoint-description">Obtener cliente por DNI</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-url">/api/clientes</span>
+                    <p class="endpoint-description">Crear nuevo cliente</p>
+                    <div class="endpoint-example">
+                        <h4>Body:</h4>
+                        <div class="code-block">{
+  "nombre": "José",
+  "apellido": "Martínez",
+  "dni": "12345678",
+  "telefono": "555-0201",
+  "email": "jose.martinez@email.com",
+  "direccion": "Calle Principal 1"
+}</div>
+                    </div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method put">PUT</span>
+                    <span class="endpoint-url">/api/clientes/:id</span>
+                    <p class="endpoint-description">Actualizar cliente</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method delete">DELETE</span>
+                    <span class="endpoint-url">/api/clientes/:id</span>
+                    <p class="endpoint-description">Eliminar cliente</p>
+                </div>
+            </div>
+            
+            <!-- Usuarios -->
+            <div class="endpoint-group" id="usuarios">
+                <h2>👤 Usuarios</h2>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/usuarios</span>
+                    <p class="endpoint-description">Obtener todos los usuarios (sin password)</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/usuarios')">🚀 Probar</button>
+                    <div class="response-area" id="response-4"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-url">/api/usuarios</span>
+                    <p class="endpoint-description">Crear nuevo usuario</p>
+                    <div class="endpoint-example">
+                        <h4>Body:</h4>
+                        <div class="code-block">{
+  "username": "admin",
+  "password": "admin123",
+  "nombre": "Administrador Principal",
+  "email": "admin@ferreteria.com",
+  "rol": "admin",
+  "activo": true
+}</div>
+                    </div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method put">PUT</span>
+                    <span class="endpoint-url">/api/usuarios/:id</span>
+                    <p class="endpoint-description">Actualizar usuario</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method delete">DELETE</span>
+                    <span class="endpoint-url">/api/usuarios/:id</span>
+                    <p class="endpoint-description">Eliminar usuario</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method put">PUT</span>
+                    <span class="endpoint-url">/api/usuarios/:id/password</span>
+                    <p class="endpoint-description">Cambiar password</p>
+                </div>
+            </div>
+            
+            <!-- Productos -->
+            <div class="endpoint-group" id="productos">
+                <h2>📦 Productos</h2>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/productos</span>
+                    <p class="endpoint-description">Obtener todos los productos</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/productos')">🚀 Probar</button>
+                    <div class="response-area" id="response-5"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/productos/search?termino=Hammer</span>
+                    <p class="endpoint-description">Buscar productos</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/productos/lowstock</span>
+                    <p class="endpoint-description">Obtener productos con stock bajo</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/productos/lowstock')">🚀 Probar</button>
+                    <div class="response-area" id="response-6"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/productos/categoria/:idCategoria</span>
+                    <p class="endpoint-description">Obtener productos por categoría</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-url">/api/productos</span>
+                    <p class="endpoint-description">Crear nuevo producto</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method put">PUT</span>
+                    <span class="endpoint-url">/api/productos/:id</span>
+                    <p class="endpoint-description">Actualizar producto</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method delete">DELETE</span>
+                    <span class="endpoint-url">/api/productos/:id</span>
+                    <p class="endpoint-description">Eliminar producto (soft delete)</p>
+                </div>
+            </div>
+            
+            <!-- Ventas -->
+            <div class="endpoint-group" id="ventas">
+                <h2>💰 Ventas</h2>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/ventas</span>
+                    <p class="endpoint-description">Obtener todas las ventas</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/ventas')">🚀 Probar</button>
+                    <div class="response-area" id="response-7"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/ventas/:id</span>
+                    <p class="endpoint-description">Obtener venta con detalles</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/ventas/1')">🚀 Probar</button>
+                    <div class="response-area" id="response-8"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/ventas/fecha?fechaInicio=2025-01-01&fechaFin=2026-12-31</span>
+                    <p class="endpoint-description">Obtener ventas por fecha</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/ventas/today</span>
+                    <p class="endpoint-description">Obtener ventas del día</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/ventas/summary?fechaInicio=2025-01-01&fechaFin=2026-12-31</span>
+                    <p class="endpoint-description">Obtener resumen de ventas</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-url">/api/ventas</span>
+                    <p class="endpoint-description">Crear nueva venta</p>
+                    <div class="endpoint-example">
+                        <h4>Body:</h4>
+                        <div class="code-block">{
+  "id_cliente": 1,
+  "metodo_pago": "efectivo",
+  "descuento": 0,
+  "detalles": [
+    { "id_producto": 1, "cantidad": 2 },
+    { "id_producto": 3, "cantidad": 1 }
+  ]
+}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Detalles de Venta -->
+            <div class="endpoint-group" id="detalles">
+                <h2>📋 Detalles de Venta</h2>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/venta-detalles/:idVenta</span>
+                    <p class="endpoint-description">Obtener detalles de una venta</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/venta-detalles/1')">🚀 Probar</button>
+                    <div class="response-area" id="response-9"></div>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/venta-detalles/producto/:idProducto</span>
+                    <p class="endpoint-description">Obtener historial de ventas de un producto</p>
+                </div>
+                
+                <div class="endpoint-item">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-url">/api/venta-detalles/top?limit=10</span>
+                    <p class="endpoint-description">Obtener productos más vendidos</p>
+                    <button class="try-button" onclick="testEndpoint('GET', '/api/venta-detalles/top?limit=5')">🚀 Probar</button>
+                    <div class="response-area" id="response-10"></div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h4>🎯 Datos de Prueba</h4>
+                <ul>
+                    <li>9 Categorías</li>
+                    <li>10 Proveedores</li>
+                    <li>30 Clientes</li>
+                    <li>100 Productos</li>
+                    <li>30 Usuarios</li>
+                    <li>20 Ventas</li>
+                    <li>63 Detalles de venta</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

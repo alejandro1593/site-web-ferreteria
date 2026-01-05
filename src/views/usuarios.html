@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="categorias.html"><i>📁</i> Categorías</a>
+            <a href="proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="clientes.html"><i>👥</i> Clientes</a>
+            <a href="usuarios.html" class="active"><i>👤</i> Usuarios</a>
+            <a href="productos.html"><i>📦</i> Productos</a>
+            <a href="ventas.html"><i>💰</i> Ventas</a>
+            <a href="reportes.html"><i>📈</i> Reportes</a>
+            <a href="api.html"><i>🔧</i> API Docs</a>
+        </div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>👤 Usuarios</h1>
+            <p>Gestión de usuarios del sistema</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Lista de Usuarios</h3>
+                <div class="card-actions">
+                    <button class="btn btn-primary" onclick="openUsuarioModal()">
+                        ➕ Nuevo Usuario
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="usuarios-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Rol</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usuarios-tbody">
+                            <tr>
+                                <td colspan="8" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Modal Nuevo/Editar Usuario -->
+    <div id="usuario-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="usuario-modal-title">Nuevo Usuario</h3>
+                <button class="modal-close" onclick="closeModal('usuario-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="usuario-form">
+                    <input type="hidden" id="usuario-id">
+                    
+                    <div class="form-group">
+                        <label for="usuario-username">Username *</label>
+                        <input type="text" id="usuario-username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="usuario-password">Password *</label>
+                        <input type="password" id="usuario-password" required>
+                        <small id="password-hint">Mínimo 6 caracteres</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="usuario-nombre">Nombre *</label>
+                        <input type="text" id="usuario-nombre" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="usuario-email">Email</label>
+                        <input type="email" id="usuario-email">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="usuario-rol">Rol</label>
+                            <select id="usuario-rol">
+                                <option value="vendedor">Vendedor</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="usuario-activo">Estado</label>
+                            <select id="usuario-activo">
+                                <option value="true">Activo</option>
+                                <option value="false">Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('usuario-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveUsuario()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Cambiar Password -->
+    <div id="password-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Cambiar Password</h3>
+                <button class="modal-close" onclick="closeModal('password-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="password-form">
+                    <input type="hidden" id="password-usuario-id">
+                    <div class="form-group">
+                        <label for="nuevo-password">Nuevo Password *</label>
+                        <input type="password" id="nuevo-password" required>
+                        <small>Mínimo 6 caracteres</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('password-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="cambiarPassword()">Cambiar Password</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/usuarios.js"></script>
+</body>
+</html>

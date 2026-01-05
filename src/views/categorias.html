@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categorías - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="categorias.html" class="active"><i>📁</i> Categorías</a>
+            <a href="proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="clientes.html"><i>👥</i> Clientes</a>
+            <a href="usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="productos.html"><i>📦</i> Productos</a>
+            <a href="ventas.html"><i>💰</i> Ventas</a>
+            <a href="reportes.html"><i>📈</i> Reportes</a>
+            <a href="api.html"><i>🔧</i> API Docs</a>
+        </div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>📁 Categorías</h1>
+            <p>Gestión de categorías de productos</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Lista de Categorías</h3>
+                <div class="card-actions">
+                    <input type="text" id="search-categoria" placeholder="Buscar..." class="search-input">
+                    <button class="btn btn-primary" onclick="openCategoriaModal()">
+                        ➕ Nueva Categoría
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="categorias-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Descripción</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categorias-tbody">
+                            <tr>
+                                <td colspan="4" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Modal Nueva/Editar Categoría -->
+    <div id="categoria-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="categoria-modal-title">Nueva Categoría</h3>
+                <button class="modal-close" onclick="closeModal('categoria-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="categoria-form">
+                    <input type="hidden" id="categoria-id">
+                    <div class="form-group">
+                        <label for="categoria-nombre">Nombre *</label>
+                        <input type="text" id="categoria-nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="categoria-descripcion">Descripción</label>
+                        <textarea id="categoria-descripcion" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('categoria-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveCategoria()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/categorias.js"></script>
+</body>
+</html>

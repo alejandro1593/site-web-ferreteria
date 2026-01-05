@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <!-- Menu Toggle para móvil -->
+    <button class="menu-toggle">☰</button>
+    
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="dashboard.html" class="active">
+                <i>📊</i> Dashboard
+            </a>
+            <a href="categorias.html">
+                <i>📁</i> Categorías
+            </a>
+            <a href="proveedores.html">
+                <i>🏢</i> Proveedores
+            </a>
+            <a href="clientes.html">
+                <i>👥</i> Clientes
+            </a>
+            <a href="usuarios.html">
+                <i>👤</i> Usuarios
+            </a>
+            <a href="productos.html">
+                <i>📦</i> Productos
+            </a>
+            <a href="ventas.html">
+                <i>💰</i> Ventas
+            </a>
+            <a href="reportes.html">
+                <i>📈</i> Reportes
+            </a>
+            <a href="api.html">
+                <i>🔧</i> API Docs
+            </a>
+            <a href="products.html">
+                <i>🛍️</i> Catálogo
+            </a>
+        </div>
+    </nav>
+    
+    <!-- Contenido Principal -->
+    <main class="main-content">
+        <div class="page-header">
+            <h1 id="page-title">Dashboard</h1>
+            <p id="page-subtitle">Resumen general del sistema</p>
+        </div>
+        
+        <div class="stats-grid" id="stats-grid">
+            <!-- Estadísticas se cargarán dinámicamente -->
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📋 Ventas Recientes</h3>
+                <button class="btn btn-primary btn-sm" onclick="navigateTo('ventas.html')">
+                    Ver todas
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="recent-sales-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Cliente</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-sales-tbody">
+                            <tr>
+                                <td colspan="5" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📦 Productos con Stock Bajo</h3>
+                <button class="btn btn-warning btn-sm" onclick="navigateTo('productos.html')">
+                    Gestionar stock
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="low-stock-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Código</th>
+                                <th>Stock Actual</th>
+                                <th>Stock Mínimo</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="low-stock-tbody">
+                            <tr>
+                                <td colspan="5" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
