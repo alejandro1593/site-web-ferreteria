@@ -64,6 +64,44 @@ const VentaController = {
     });
   },
 
+  // Obtener historial de compras de un cliente en un período
+  getHistorialCliente: (req, res) => {
+    const { idCliente } = req.params;
+    const { fechaInicio, fechaFin } = req.query;
+
+    const currentYear = new Date().getFullYear();
+    const inicio = fechaInicio || `${currentYear}-01-01`;
+    const fin = fechaFin || `${currentYear}-12-31`;
+
+    Venta.getHistorialCliente(idCliente, inicio, fin, (err, ventas) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error al obtener historial de compras' });
+      }
+
+      Venta.getResumenCliente(idCliente, inicio, fin, (err, resumen) => {
+        if (err) {
+          return res.status(500).json({ error: 'Error al obtener resumen de compras' });
+        }
+
+        res.json({
+          ventas,
+          resumen: resumen[0] || {}
+        });
+      });
+    });
+  },
+
+  // Obtener detalles completos de una venta con información de productos
+  getDetallesVenta: (req, res) => {
+    const { id } = req.params;
+    VentaDetalle.findByIdVenta(id, (err, detalles) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error al obtener detalles de venta' });
+      }
+      res.json(detalles);
+    });
+  },
+
   // Obtener ventas del día
   getTodaySales: (req, res) => {
     Venta.getTodaySales((err, results) => {
@@ -92,7 +130,7 @@ const VentaController = {
 
   // Crear nueva venta
   create: (req, res) => {
-    const { id_cliente, detalles, metodo_pago, descuento = 0 } = req.body;
+    const { id_cliente, detalles, metodo_pago, descuento = 0 } = req.body || {};
     
     if (!detalles || detalles.length === 0) {
       return res.status(400).json({ error: 'Se debe incluir al menos un detalle' });

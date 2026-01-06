@@ -1,5 +1,3 @@
-const API_BASE_URL = 'http://localhost:3000/api';
-
 let productos = [];
 let categorias = [];
 let proveedores = [];
@@ -7,24 +5,24 @@ let proveedores = [];
 // Cargar categorías y proveedores para los select
 async function loadCategoriasYProveedores() {
     try {
-        categorias = await fetchAPI('/categorias');
-        proveedores = await fetchAPI('/proveedores');
-        
+        categorias = await fetchAPIAuth('/categorias');
+        proveedores = await fetchAPIAuth('/proveedores');
+
         // Llenar select de categorías
         const categoriaSelect = document.getElementById('producto-categoria');
-        categoriaSelect.innerHTML = '<option value="">Seleccionar...</option>' + 
+        categoriaSelect.innerHTML = '<option value="">Seleccionar...</option>' +
             categorias.map(cat => `<option value="${cat.id_categoria}">${cat.nombre}</option>`).join('');
-        
+
         // Llenar select de categorías para filtro
         const filterCategoriaSelect = document.getElementById('filter-categoria');
-        filterCategoriaSelect.innerHTML = '<option value="">Todas las categorías</option>' + 
+        filterCategoriaSelect.innerHTML = '<option value="">Todas las categorías</option>' +
             categorias.map(cat => `<option value="${cat.id_categoria}">${cat.nombre}</option>`).join('');
-        
+
         // Llenar select de proveedores
         const proveedorSelect = document.getElementById('producto-proveedor');
-        proveedorSelect.innerHTML = '<option value="">Seleccionar...</option>' + 
+        proveedorSelect.innerHTML = '<option value="">Seleccionar...</option>' +
             proveedores.map(prov => `<option value="${prov.id_proveedor}">${prov.nombre}</option>`).join('');
-        
+
     } catch (error) {
         console.error('Error cargando categorías y proveedores:', error);
     }
@@ -32,14 +30,18 @@ async function loadCategoriasYProveedores() {
 
 // Cargar productos
 async function loadProductos(endpoint = '/productos') {
+    console.log('🔄 Cargando productos...');
     try {
-        productos = await fetchAPI(endpoint);
+        console.log('📡 Llamando a API:', endpoint);
+        productos = await fetchAPIAuth(endpoint);
+        console.log('✅ Productos recibidos:', productos.length, 'productos');
+        console.log('📊 Primer producto:', productos[0]);
         renderProductos(productos);
     } catch (error) {
-        console.error('Error cargando productos:', error);
+        console.error('❌ Error cargando productos:', error);
         document.getElementById('productos-container').innerHTML = `
             <div class="alert alert-danger">
-                Error al cargar productos
+                Error al cargar productos: ${error.message}
             </div>
         `;
     }
@@ -47,7 +49,13 @@ async function loadProductos(endpoint = '/productos') {
 
 // Renderizar productos
 function renderProductos(data) {
+    console.log('🎨 Renderizando productos:', data.length, 'productos');
     const container = document.getElementById('productos-container');
+    
+    if (!container) {
+        console.error('❌ Contenedor #productos-container no encontrado');
+        return;
+    }
     
     if (data.length === 0) {
         container.innerHTML = `
@@ -59,15 +67,22 @@ function renderProductos(data) {
         return;
     }
     
-    container.innerHTML = data.map(producto => {
+    console.log('🖼️ Generando HTML para productos...');
+    const html = data.map(producto => {
         const stockClass = producto.stock_actual <= producto.stock_minimo ? 'stock-low' : 'stock-ok';
         const stockText = producto.stock_actual <= producto.stock_minimo ? 'Stock bajo' : 'Stock OK';
         
+        console.log('🖼️ Procesando producto:', producto.nombre, '- Imagen:', producto.imagen);
+        
         return `
             <div class="product-card">
-                <img src="${producto.imagen}" alt="${producto.nombre}" 
-                     class="product-image" 
-                     onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
+                <div style="width: 100%; height: 200px; overflow: hidden; background: #f5f5f5; display: flex; align-items: center; justify-content: center;">
+                    <img src="${producto.imagen}" 
+                         alt="${producto.nombre}" 
+                         class="product-image" 
+                         style="display: block; max-width: 100%; max-height: 100%; object-fit: contain;"
+                         onerror="console.log('❌ Error cargando imagen:', this.src); this.src='https://via.placeholder.com/400?text=No+Image'; this.onerror=null;">
+                </div>
                 <div class="product-info">
                     <h4>${producto.nombre}</h4>
                     <p><small>Código: ${producto.codigo}</small></p>
@@ -90,6 +105,19 @@ function renderProductos(data) {
             </div>
         `;
     }).join('');
+    
+    console.log('💾 Insertando HTML en contenedor...');
+    container.innerHTML = html;
+    console.log('✅ Productos renderizados exitosamente');
+    
+    // Forzar recarga de imágenes
+    setTimeout(() => {
+        const images = container.querySelectorAll('img.product-image');
+        console.log('🖼️ Imágenes en el DOM:', images.length);
+        images.forEach((img, index) => {
+            console.log(`🖼️ Imagen ${index}:`, img.src);
+        });
+    }, 100);
 }
 
 // Buscar productos
@@ -125,14 +153,112 @@ function openProductoModal() {
     document.getElementById('producto-form').reset();
     document.getElementById('producto-id').value = '';
     document.getElementById('producto-activo').value = 'true';
+    document.getElementById('producto-imagen-url').value = '';
+    document.getElementById('producto-imagen-archivo').value = '';
+    document.getElementById('image-preview-container').style.display = 'none';
+    document.getElementById('file-info').style.display = 'none';
+    
+    // Resetear a URL por defecto
+    document.getElementById('tipo-url').checked = true;
+    document.getElementById('url-imagen-group').style.display = 'block';
+    document.getElementById('archivo-imagen-group').style.display = 'none';
+    
     openModal('producto-modal');
+}
+
+// Previsualizar imagen
+function previewImage() {
+    const tipoImagen = document.querySelector('input[name="tipo-imagen"]:checked').value;
+    const imagenUrl = document.getElementById('producto-imagen-url').value.trim();
+    const imagenArchivo = document.getElementById('producto-imagen-archivo');
+    const previewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const fileInfo = document.getElementById('file-info');
+    
+    if (tipoImagen === 'url') {
+        // Previsualizar URL externa
+        if (imagenUrl) {
+            previewContainer.style.display = 'block';
+            imagePreview.src = imagenUrl;
+            imagePreview.onerror = function() {
+                this.src = 'https://via.placeholder.com/400?text=URL+Inválida';
+            };
+            fileInfo.style.display = 'none';
+        } else {
+            previewContainer.style.display = 'none';
+            fileInfo.style.display = 'none';
+        }
+    } else if (tipoImagen === 'archivo') {
+        // Previsualizar archivo subido
+        if (imagenArchivo.files && imagenArchivo.files[0]) {
+            const file = imagenArchivo.files[0];
+            
+            // Validar tamaño del archivo (máximo 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showNotification('El archivo supera el límite de 5MB', 'error');
+                imagenArchivo.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            // Validar tipo de archivo
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showNotification('Tipo de archivo no permitido', 'error');
+                imagenArchivo.value = '';
+                previewContainer.style.display = 'none';
+                return;
+            }
+            
+            // Mostrar nombre del archivo
+            const fileName = file.name;
+            fileInfo.innerHTML = `Se guardará como: <span id="nombre-archivo">${fileName}</span>`;
+            fileInfo.style.display = 'block';
+            
+            // Leer archivo y previsualizar
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dataUrl = e.target.result;
+                previewContainer.style.display = 'block';
+                imagePreview.src = dataUrl;
+                imagePreview.onerror = null;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewContainer.style.display = 'none';
+            fileInfo.style.display = 'none';
+        }
+    } else {
+        previewContainer.style.display = 'none';
+        fileInfo.style.display = 'none';
+    }
+}
+
+// Función para alternar entre URL y archivo
+function toggleImageType(tipo) {
+    const urlGroup = document.getElementById('url-imagen-group');
+    const archivoGroup = document.getElementById('archivo-imagen-group');
+    const urlInput = document.getElementById('producto-imagen-url');
+    const archivoInput = document.getElementById('producto-imagen-archivo');
+    
+    if (tipo === 'url') {
+        urlGroup.style.display = 'block';
+        archivoGroup.style.display = 'none';
+        urlInput.value = '';
+        archivoInput.value = '';
+    } else {
+        urlGroup.style.display = 'none';
+        archivoGroup.style.display = 'block';
+        archivoInput.value = '';
+        archivoInput.value = '';
+    }
 }
 
 // Editar producto
 async function editProducto(id) {
     try {
-        const producto = await fetchAPI(`/productos/${id}`);
-        
+        const producto = await fetchAPIAuth(`/productos/${id}`);
+
         document.getElementById('producto-modal-title').textContent = 'Editar Producto';
         document.getElementById('producto-id').value = producto.id_producto;
         document.getElementById('producto-nombre').value = producto.nombre;
@@ -145,93 +271,218 @@ async function editProducto(id) {
         document.getElementById('producto-categoria').value = producto.id_categoria || '';
         document.getElementById('producto-proveedor').value = producto.id_proveedor || '';
         document.getElementById('producto-activo').value = producto.activo ? 'true' : 'false';
+
+        // Determinar tipo de imagen actual
+        let tipoImagen = 'url';
+        let imagenUrl = '';
+
+        if (producto.imagen) {
+            if (producto.imagen.startsWith('/uploads/')) {
+                // Es un archivo subido
+                tipoImagen = 'archivo';
+                imagenUrl = producto.imagen;
+            } else {
+                // Es una URL externa
+                tipoImagen = 'url';
+                imagenUrl = producto.imagen;
+            }
+        }
+        
+        // Configurar radio buttons según tipo
+        document.getElementById('tipo-url').checked = (tipoImagen === 'url');
+        document.getElementById('tipo-archivo').checked = (tipoImagen === 'archivo');
+        
+        // Mostrar campos apropiados
+        document.getElementById('url-imagen-group').style.display = (tipoImagen === 'url') ? 'block' : 'none';
+        document.getElementById('archivo-imagen-group').style.display = (tipoImagen === 'archivo') ? 'block' : 'none';
+        
+        // Previsualizar imagen
+        if (imagenUrl) {
+            const previewContainer = document.getElementById('image-preview-container');
+            const imagePreview = document.getElementById('image-preview');
+            previewContainer.style.display = 'block';
+            imagePreview.src = imagenUrl;
+            imagePreview.onerror = function() {
+                this.src = 'https://via.placeholder.com/400?text=URL+Inválida';
+            };
+            document.getElementById('file-info').style.display = 'none';
+        } else {
+            document.getElementById('image-preview-container').style.display = 'none';
+            document.getElementById('file-info').style.display = 'none';
+        }
         
         openModal('producto-modal');
     } catch (error) {
         console.error('Error cargando producto:', error);
-        showAlert('Error al cargar el producto', 'danger');
+        showNotification('Error al cargar el producto', 'error');
     }
 }
 
 // Actualizar stock
 async function updateStock(id) {
     const nuevoStock = prompt('Ingrese el nuevo stock:');
-    
+
     if (nuevoStock === null || nuevoStock.trim() === '') {
         return;
     }
-    
+
     try {
-        await fetchAPI(`/productos/${id}/stock`, {
+        await fetchAPIAuth(`/productos/${id}/stock`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cantidad: parseInt(nuevoStock) })
+            body: { cantidad: parseInt(nuevoStock) }
         });
-        
-        showAlert('Stock actualizado exitosamente', 'success');
+
+        showNotification('Stock actualizado exitosamente', 'success');
         await loadProductos();
-        
+
     } catch (error) {
         console.error('Error actualizando stock:', error);
-        showAlert('Error al actualizar el stock', 'danger');
+        showNotification('Error al actualizar el stock', 'error');
     }
 }
 
 // Guardar producto
 async function saveProducto() {
-    const id = document.getElementById('producto-id').value;
-    const nombre = document.getElementById('producto-nombre').value.trim();
-    const codigo = document.getElementById('producto-codigo').value.trim();
-    const descripcion = document.getElementById('producto-descripcion').value.trim();
-    const precioCompra = document.getElementById('producto-precio-compra').value;
-    const precioVenta = document.getElementById('producto-precio-venta').value;
-    const stockActual = document.getElementById('producto-stock-actual').value;
-    const stockMinimo = document.getElementById('producto-stock-minimo').value;
-    const categoria = document.getElementById('producto-categoria').value;
-    const proveedor = document.getElementById('producto-proveedor').value;
-    const activo = document.getElementById('producto-activo').value === 'true';
+    console.log('💾 Iniciando saveProducto()...');
     
+    const idInput = document.getElementById('producto-id');
+    const nombreInput = document.getElementById('producto-nombre');
+    const codigoInput = document.getElementById('producto-codigo');
+    const descripcionInput = document.getElementById('producto-descripcion');
+    const precioCompraInput = document.getElementById('producto-precio-compra');
+    const precioVentaInput = document.getElementById('producto-precio-venta');
+    const stockActualInput = document.getElementById('producto-stock-actual');
+    const stockMinimoInput = document.getElementById('producto-stock-minimo');
+    const categoriaInput = document.getElementById('producto-categoria');
+    const proveedorInput = document.getElementById('producto-proveedor');
+    const activoInput = document.getElementById('producto-activo');
+    
+    console.log('🔍 Elementos del formulario:', {
+        id: idInput?.value,
+        nombre: nombreInput?.value,
+        codigo: codigoInput?.value,
+        descripcion: descripcionInput?.value,
+        precioCompra: precioCompraInput?.value,
+        precioVenta: precioVentaInput?.value,
+        stockActual: stockActualInput?.value,
+        stockMinimo: stockMinimoInput?.value,
+        categoria: categoriaInput?.value,
+        proveedor: proveedorInput?.value,
+        activo: activoInput?.value
+    });
+    
+    const id = idInput ? idInput.value : '';
+    const nombre = nombreInput ? nombreInput.value.trim() : '';
+    const codigo = codigoInput ? codigoInput.value.trim() : '';
+    const descripcion = descripcionInput ? descripcionInput.value.trim() : '';
+    const precioCompra = precioCompraInput ? precioCompraInput.value : '';
+    const precioVenta = precioVentaInput ? precioVentaInput.value : '';
+    const stockActual = stockActualInput ? stockActualInput.value : '';
+    const stockMinimo = stockMinimoInput ? stockMinimoInput.value : '';
+    const categoria = categoriaInput ? categoriaInput.value : '';
+    const proveedor = proveedorInput ? proveedorInput.value : '';
+    const activo = activoInput ? activoInput.value === 'true' : true;
+
+    console.log('📋 Datos del formulario:', { id, nombre, codigo, descripcion, precioCompra, precioVenta, stockActual, stockMinimo, categoria, proveedor, activo });
+
+    const tipoImagen = document.querySelector('input[name="tipo-imagen"]:checked').value;
+    let imagen = document.getElementById('producto-imagen-url').value.trim();
+    const imagenArchivo = document.getElementById('producto-imagen-archivo');
+
     if (!nombre || !precioVenta) {
-        showAlert('Nombre y precio de venta son obligatorios', 'warning');
+        showNotification('Nombre y precio de venta son obligatorios', 'warning');
         return;
     }
-    
-    try {
-        const data = {
-            nombre,
-            descripcion,
-            codigo,
-            precio_compra: parseFloat(precioCompra) || null,
-            precio_venta: parseFloat(precioVenta),
-            stock_actual: parseInt(stockActual) || 0,
-            stock_minimo: parseInt(stockMinimo) || 0,
-            id_categoria: categoria ? parseInt(categoria) : null,
-            id_proveedor: proveedor ? parseInt(proveedor) : null,
-            activo
-        };
-        
-        if (id) {
-            await fetchAPI(`/productos/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            showAlert('Producto actualizado exitosamente', 'success');
-        } else {
-            await fetchAPI('/productos', {
+
+    // Preparar datos
+    const data = {
+        nombre,
+        descripcion,
+        codigo,
+        precio_compra: parseFloat(precioCompra) || null,
+        precio_venta: parseFloat(precioVenta),
+        stock_actual: parseInt(stockActual) || 0,
+        stock_minimo: parseInt(stockMinimo) || 0,
+        id_categoria: categoria ? parseInt(categoria) : null,
+        id_proveedor: proveedor ? parseInt(proveedor) : null,
+        activo
+    };
+
+    console.log('📦 Datos preparados para enviar:', data);
+
+    // Manejar imagen según el tipo seleccionado
+    if (tipoImagen === 'archivo' && imagenArchivo.files && imagenArchivo.files[0]) {
+        // Subir archivo y crear producto
+        console.log('📤 Subiendo producto con archivo...');
+        const formData = new FormData();
+        formData.append('imagen', imagenArchivo.files[0]);
+        formData.append('nombre', nombre);
+        formData.append('codigo', codigo);
+        formData.append('descripcion', descripcion);
+        formData.append('precio_compra', precioCompra);
+        formData.append('precio_venta', precioVenta);
+        formData.append('stock_actual', stockActual);
+        formData.append('stock_minimo', stockMinimo);
+        formData.append('id_categoria', categoria);
+        formData.append('id_proveedor', proveedor);
+        formData.append('activo', activo);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/productos/upload', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                body: formData
             });
-            showAlert('Producto creado exitosamente', 'success');
+
+            console.log('📡 Response status:', response.status);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || errorData.message || 'Error al crear producto');
+            }
+
+            const result = await response.json();
+
+            showNotification(result.message || 'Producto creado exitosamente', 'success');
+            closeModal('producto-modal');
+            await loadProductos();
+
+        } catch (error) {
+            console.error('❌ Error creando producto con imagen:', error);
+            showNotification(error.message || 'Error al crear el producto', 'error');
         }
-        
-        closeModal('producto-modal');
-        await loadProductos();
-        
-    } catch (error) {
-        console.error('Error guardando producto:', error);
-        showAlert('Error al guardar el producto', 'danger');
+    } else {
+        try {
+            // Usar URL externa
+            console.log('📤 Enviando producto con URL de imagen...');
+            if (imagen) {
+                data.imagen = imagen;
+            } else {
+                // Usar imagen existente o placeholder
+                const productoId = id || (productos.length > 0 ? productos[productos.length -1].id_producto : null);
+                const productoExistente = productoId ? productos.find(p => p.id_producto === productoId) : null;
+                data.imagen = productoExistente ? productoExistente.imagen : 'https://via.placeholder.com/400?text=Sin+Imagen';
+            }
+
+            console.log('📦 Enviando datos:', data);
+            const url = id ? `/productos/${id}` : '/productos';
+            const method = id ? 'PUT' : 'POST';
+
+            console.log(`📡 Llamando a API: ${url}, Método: ${method}`);
+
+            const result = await fetchAPIAuth(url, {
+                method: method,
+                body: data
+            });
+
+            showNotification(id ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente', 'success');
+            closeModal('producto-modal');
+            await loadProductos();
+        } catch (error) {
+            console.error('❌ Error guardando producto:', error);
+            showNotification(error.message || 'Error al guardar el producto', 'error');
+        }
     }
 }
 
@@ -240,18 +491,18 @@ async function deleteProducto(id) {
     if (!confirm('¿Está seguro de eliminar este producto?')) {
         return;
     }
-    
+
     try {
-        await fetchAPI(`/productos/${id}`, {
+        await fetchAPIAuth(`/productos/${id}`, {
             method: 'DELETE'
         });
-        
-        showAlert('Producto eliminado exitosamente', 'success');
+
+        showNotification('Producto eliminado exitosamente', 'success');
         await loadProductos();
-        
+
     } catch (error) {
         console.error('Error eliminando producto:', error);
-        showAlert('Error al eliminar el producto', 'danger');
+        showNotification('Error al eliminar el producto', 'error');
     }
 }
 
@@ -259,4 +510,12 @@ async function deleteProducto(id) {
 document.addEventListener('DOMContentLoaded', () => {
     loadCategoriasYProveedores();
     loadProductos();
+
+    // Prevenir envío del formulario por Enter
+    const productoForm = document.getElementById('producto-form');
+    if (productoForm) {
+        productoForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+        });
+    }
 });

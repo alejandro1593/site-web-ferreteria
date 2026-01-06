@@ -146,7 +146,7 @@ const Producto = {
       SELECT p.*, c.nombre as categoria_nombre 
       FROM productos p 
       LEFT JOIN categorias c ON p.id_categoria = c.id_categoria 
-      WHERE p.stock_actual <= p.stock_minimo AND p.activo = TRUE 
+      WHERE p.stock_actual < 20 AND p.activo = TRUE 
       ORDER BY p.stock_actual ASC
     `;
     connection.query(sql, callback);

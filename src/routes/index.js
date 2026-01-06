@@ -19,4 +19,21 @@ router.use('/productos', productoRoutes);
 router.use('/ventas', ventaRoutes);
 router.use('/venta-detalles', ventaDetalleRoutes);
 
+// Ruta raíz para API
+router.get('/', (req, res) => {
+    res.json({
+        message: 'Sistema de Ferretería API',
+        version: '1.0.0',
+        endpoints: [
+            'GET /api/categorias',
+            'GET /api/proveedores',
+            'GET /api/clientes',
+            'GET /api/usuarios',
+            'GET /api/productos',
+            'GET /api/ventas',
+            'GET /api/venta-detalles'
+        ]
+    });
+});
+
 module.exports = router;

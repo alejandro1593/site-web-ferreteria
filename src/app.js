@@ -1,8 +1,11 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 require('dotenv').config();
 
-// Importar modelos (esto creará las tablas automáticamente)
+// Importar modelos
 require('./models/Categoria');
 require('./models/Proveedor');
 require('./models/Cliente');
@@ -11,7 +14,45 @@ require('./models/Producto');
 require('./models/Venta');
 require('./models/VentaDetalle');
 
+// Importar controlador
+const ProductoController = require('./controllers/ProductoController');
+
+// Importar rutas
+const apiRoutes = require('./routes');
+const viewRoutes = require('./routeViews/viewRoutes');
+const authRoutes = require('./routes/authRoutes');
+
 const app = express();
+
+// Configuración de Multer para subida de archivos
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '..', 'uploads', 'productos');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no permitido. Solo se permiten: JPG, PNG, GIF, WebP'));
+    }
+  }
+});
 
 // Middlewares básicos
 app.use(cors({
@@ -27,89 +68,16 @@ app.use(express.urlencoded({ extended: true }));
 // Servir archivos estáticos
 app.use('/static', express.static('src/static'));
 
-// Servir vistas HTML
-app.get('/', (req, res) => {
-    res.redirect('/dashboard');
-});
+// Servir archivos subidos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.get('/dashboard', (req, res) => {
-    res.sendFile(__dirname + '/views/dashboard.html');
-});
-app.get('/dashboard.html', (req, res) => {
-    res.sendFile(__dirname + '/views/dashboard.html');
-});
-
-app.get('/categorias', (req, res) => {
-    res.sendFile(__dirname + '/views/categorias.html');
-});
-app.get('/categorias.html', (req, res) => {
-    res.sendFile(__dirname + '/views/categorias.html');
-});
-
-app.get('/proveedores', (req, res) => {
-    res.sendFile(__dirname + '/views/proveedores.html');
-});
-app.get('/proveedores.html', (req, res) => {
-    res.sendFile(__dirname + '/views/proveedores.html');
-});
-
-app.get('/clientes', (req, res) => {
-    res.sendFile(__dirname + '/views/clientes.html');
-});
-app.get('/clientes.html', (req, res) => {
-    res.sendFile(__dirname + '/views/clientes.html');
-});
-
-app.get('/usuarios', (req, res) => {
-    res.sendFile(__dirname + '/views/usuarios.html');
-});
-app.get('/usuarios.html', (req, res) => {
-    res.sendFile(__dirname + '/views/usuarios.html');
-});
-
-app.get('/productos', (req, res) => {
-    res.sendFile(__dirname + '/views/productos.html');
-});
-app.get('/productos.html', (req, res) => {
-    res.sendFile(__dirname + '/views/productos.html');
-});
-
-app.get('/ventas', (req, res) => {
-    res.sendFile(__dirname + '/views/ventas.html');
-});
-app.get('/ventas.html', (req, res) => {
-    res.sendFile(__dirname + '/views/ventas.html');
-});
-
-app.get('/reportes', (req, res) => {
-    res.sendFile(__dirname + '/views/reportes.html');
-});
-app.get('/reportes.html', (req, res) => {
-    res.sendFile(__dirname + '/views/reportes.html');
-});
-
-app.get('/api-docs', (req, res) => {
-    res.sendFile(__dirname + '/views/api.html');
-});
-app.get('/api.html', (req, res) => {
-    res.sendFile(__dirname + '/views/api.html');
-});
-
-app.get('/catalogo', (req, res) => {
-    res.sendFile(__dirname + '/views/products.html');
-});
-app.get('/products.html', (req, res) => {
-    res.sendFile(__dirname + '/views/products.html');
-});
-
-// Importar rutas
-const apiRoutes = require('./routes');
-
-// Montar rutas API
+// Montar rutas
+app.use('/', viewRoutes);
 app.use('/api', apiRoutes);
+app.use('/api/auth', authRoutes);
 
 // Servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
 });

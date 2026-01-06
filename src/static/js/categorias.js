@@ -1,11 +1,9 @@
-const API_BASE_URL = 'http://localhost:3000/api';
-
 let categorias = [];
 
 // Cargar categorías
 async function loadCategorias() {
     try {
-        categorias = await fetchAPI('/categorias');
+        categorias = await fetchAPIAuth('/categorias');
         renderCategorias(categorias);
     } catch (error) {
         console.error('Error cargando categorías:', error);
@@ -72,17 +70,17 @@ function openCategoriaModal() {
 // Editar categoría
 async function editCategoria(id) {
     try {
-        const categoria = await fetchAPI(`/categorias/${id}`);
-        
+        const categoria = await fetchAPIAuth(`/categorias/${id}`);
+
         document.getElementById('categoria-modal-title').textContent = 'Editar Categoría';
         document.getElementById('categoria-id').value = categoria.id_categoria;
         document.getElementById('categoria-nombre').value = categoria.nombre;
         document.getElementById('categoria-descripcion').value = categoria.descripcion || '';
-        
+
         openModal('categoria-modal');
     } catch (error) {
         console.error('Error cargando categoría:', error);
-        showAlert('Error al cargar la categoría', 'danger');
+        showNotification('Error al cargar la categoría', 'error');
     }
 }
 
@@ -93,36 +91,34 @@ async function saveCategoria() {
     const descripcion = document.getElementById('categoria-descripcion').value.trim();
     
     if (!nombre) {
-        showAlert('El nombre es obligatorio', 'warning');
+        showNotification('El nombre es obligatorio', 'warning');
         return;
     }
     
     try {
         const data = { nombre, descripcion };
         let result;
-        
+
         if (id) {
-            result = await fetchAPI(`/categorias/${id}`, {
+            result = await fetchAPIAuth(`/categorias/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Categoría actualizada exitosamente', 'success');
+            showNotification('Categoría actualizada exitosamente', 'success');
         } else {
-            result = await fetchAPI('/categorias', {
+            result = await fetchAPIAuth('/categorias', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Categoría creada exitosamente', 'success');
+            showNotification('Categoría creada exitosamente', 'success');
         }
-        
+
         closeModal('categoria-modal');
         await loadCategorias();
-        
+
     } catch (error) {
         console.error('Error guardando categoría:', error);
-        showAlert('Error al guardar la categoría', 'danger');
+        showNotification('Error al guardar la categoría', 'error');
     }
 }
 
@@ -133,16 +129,16 @@ async function deleteCategoria(id) {
     }
     
     try {
-        await fetchAPI(`/categorias/${id}`, {
+        await fetchAPIAuth(`/categorias/${id}`, {
             method: 'DELETE'
         });
-        
-        showAlert('Categoría eliminada exitosamente', 'success');
+
+        showNotification('Categoría eliminada exitosamente', 'success');
         await loadCategorias();
-        
+
     } catch (error) {
         console.error('Error eliminando categoría:', error);
-        showAlert('Error al eliminar la categoría', 'danger');
+        showNotification('Error al eliminar la categoría', 'error');
     }
 }
 

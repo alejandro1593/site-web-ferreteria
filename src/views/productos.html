@@ -16,16 +16,20 @@
         </div>
         
         <div class="sidebar-nav">
-            <a href="dashboard.html"><i>📊</i> Dashboard</a>
-            <a href="categorias.html"><i>📁</i> Categorías</a>
-            <a href="proveedores.html"><i>🏢</i> Proveedores</a>
-            <a href="clientes.html"><i>👥</i> Clientes</a>
-            <a href="usuarios.html"><i>👤</i> Usuarios</a>
-            <a href="productos.html" class="active"><i>📦</i> Productos</a>
-            <a href="ventas.html"><i>💰</i> Ventas</a>
-            <a href="reportes.html"><i>📈</i> Reportes</a>
-            <a href="api.html"><i>🔧</i> API Docs</a>
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html" class="active"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
         </div>
+        
+        <!-- Información de usuario (se cargará dinámicamente) -->
+        <div id="user-info"></div>
     </nav>
     
     <main class="main-content">
@@ -46,7 +50,7 @@
                         ➕ Nuevo Producto
                     </button>
                     <button class="btn btn-warning" onclick="loadLowStock()">
-                        ⚠️ Stock Bajo
+                        ⚠️ Stock < 20
                     </button>
                 </div>
             </div>
@@ -68,23 +72,25 @@
             <div class="modal-body">
                 <form id="producto-form">
                     <input type="hidden" id="producto-id">
-                    
+
                     <div class="form-group">
                         <label for="producto-nombre">Nombre *</label>
                         <input type="text" id="producto-nombre" required>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="producto-codigo">Código</label>
-                            <input type="text" id="producto-codigo">
+                            <input type="text" id="producto-codigo" oninput="previewImage()">
                         </div>
                         <div class="form-group">
                             <label for="producto-categoria">Categoría</label>
-                            <select id="producto-categoria" required></select>
+                            <select id="producto-categoria" required>
+                                <option value="">Seleccionar categoría...</option>
+                            </select>
                         </div>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="producto-precio-compra">Precio Compra</label>
@@ -95,7 +101,7 @@
                             <input type="number" id="producto-precio-venta" step="0.01" required>
                         </div>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="producto-stock-actual">Stock Actual</label>
@@ -106,11 +112,13 @@
                             <input type="number" id="producto-stock-minimo" value="0">
                         </div>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="producto-proveedor">Proveedor</label>
-                            <select id="producto-proveedor"></select>
+                            <select id="producto-proveedor">
+                                <option value="">Seleccionar proveedor...</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="producto-activo">Estado</label>
@@ -120,21 +128,50 @@
                             </select>
                         </div>
                     </div>
-                    
-                    <div class="form-group">
+
+                     <div class="form-group">
                         <label for="producto-descripcion">Descripción</label>
                         <textarea id="producto-descripcion" rows="3"></textarea>
+                    </div>
+
+                     <div class="form-group">
+                        <label>Tipo de Imagen</label>
+                        <div class="image-type-selector">
+                            <input type="radio" id="tipo-url" name="tipo-imagen" value="url" checked onchange="toggleImageType('url')">
+                            <label for="tipo-url">URL Externa</label>
+                            <input type="radio" id="tipo-archivo" name="tipo-imagen" value="archivo" onchange="toggleImageType('archivo')">
+                            <label for="tipo-archivo">Subir Archivo</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="url-imagen-group">
+                        <label for="producto-imagen-url">URL de Imagen</label>
+                        <input type="url" id="producto-imagen-url" placeholder="https://ejemplo.com/imagen.jpg" oninput="previewImage()">
+                        <small style="color: #666; font-size: 0.85em;">Ingresa la URL directa de la imagen</small>
+                    </div>
+
+                    <div class="form-group" id="archivo-imagen-group" style="display: none;">
+                        <label for="producto-imagen-archivo">Subir Archivo de Imagen</label>
+                        <input type="file" id="producto-imagen-archivo" accept="image/*" onchange="previewImage()">
+                        <small style="color: #666; font-size: 0.85em;">Formatos permitidos: JPG, PNG, GIF, WebP (Máximo 5MB)</small>
+                        <small style="color: #666; font-size: 0.85em; display: block;" id="file-info">Se guardará como: <span id="nombre-archivo"></span></small>
+                    </div>
+
+                    <div class="form-group" id="image-preview-container" style="display: none;">
+                        <label>Previsualización de Imagen</label>
+                        <img id="image-preview" src="" alt="Previsualización" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #e0e0e0;">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-danger" onclick="closeModal('producto-modal')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveProducto()">Guardar</button>
+                <button type="button" class="btn btn-danger" onclick="closeModal('producto-modal')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveProducto()">Guardar</button>
             </div>
         </div>
     </div>
-    
+
     <script src="/static/js/app.js"></script>
-    <script src="/static/js/productos.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/productos.js?v=3"></script>
 </body>
 </html>

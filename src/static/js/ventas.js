@@ -1,5 +1,3 @@
-const API_BASE_URL = 'http://localhost:3000/api';
-
 let productos = [];
 let clientes = [];
 let carrito = [];
@@ -7,16 +5,16 @@ let carrito = [];
 // Cargar clientes
 async function loadClientes() {
     try {
-        clientes = await fetchAPI('/clientes');
-        
+        clientes = await fetchAPIAuth('/clientes');
+
         const clienteSelect = document.getElementById('cliente-select');
-        clienteSelect.innerHTML = '<option value="">Sin cliente</option>' + 
-            clientes.map(cli => 
+        clienteSelect.innerHTML = '<option value="">Sin cliente</option>' +
+            clientes.map(cli =>
                 `<option value="${cli.id_cliente}">
                     ${cli.nombre} ${cli.apellido} - ${cli.dni}
                 </option>`
             ).join('');
-        
+
     } catch (error) {
         console.error('Error cargando clientes:', error);
     }
@@ -25,7 +23,7 @@ async function loadClientes() {
 // Cargar productos para POS
 async function loadProductosPOS() {
     try {
-        productos = await fetchAPI('/productos');
+        productos = await fetchAPIAuth('/productos');
         renderProductosPOS(productos);
     } catch (error) {
         console.error('Error cargando productos:', error);
@@ -82,7 +80,7 @@ function agregarAlCarrito(idProducto) {
         const producto = productos.find(p => p.id_producto === idProducto);
         
         if (producto.stock_actual <= 0) {
-            showAlert('Producto sin stock', 'warning');
+            showNotification('Producto sin stock', 'warning');
             return;
         }
         
@@ -113,7 +111,7 @@ function actualizarCantidad(index, nuevaCantidad) {
     
     const item = carrito[index];
     if (nuevaCantidad > item.stock_disponible) {
-        showAlert(`Solo hay ${item.stock_disponible} unidades disponibles`, 'warning');
+        showNotification(`Solo hay ${item.stock_disponible} unidades disponibles`, 'warning');
         return;
     }
     
@@ -180,7 +178,7 @@ function calcularTotales() {
 // Procesar venta
 async function procesarVenta() {
     if (carrito.length === 0) {
-        showAlert('El carrito está vacío', 'warning');
+        showNotification('El carrito está vacío', 'warning');
         return;
     }
     
@@ -203,23 +201,22 @@ async function procesarVenta() {
     };
     
     try {
-        const venta = await fetchAPI('/ventas', {
+        const venta = await fetchAPIAuth('/ventas', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(ventaData)
+            body: ventaData
         });
-        
-        showAlert(`Venta procesada exitosamente. Total: $${total.toFixed(2)}`, 'success');
-        
+
+        showNotification(`Venta procesada exitosamente. Total: $${total.toFixed(2)}`, 'success');
+
         // Limpiar carrito
         carrito = [];
         renderCarrito();
         document.getElementById('cliente-select').value = '';
         document.getElementById('descuento').value = '0';
-        
+
     } catch (error) {
         console.error('Error procesando venta:', error);
-        showAlert('Error al procesar la venta', 'danger');
+        showNotification('Error al procesar la venta', 'error');
     }
 }
 

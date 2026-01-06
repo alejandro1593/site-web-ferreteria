@@ -27,7 +27,7 @@ const ProveedorController = {
 
   // Crear nuevo proveedor
   create: (req, res) => {
-    const { nombre, contacto, telefono, email, direccion } = req.body;
+    const { nombre, contacto, telefono, email, direccion } = req.body || {};
     
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });
@@ -44,7 +44,7 @@ const ProveedorController = {
   // Actualizar proveedor
   update: (req, res) => {
     const { id } = req.params;
-    const { nombre, contacto, telefono, email, direccion } = req.body;
+    const { nombre, contacto, telefono, email, direccion } = req.body || {};
     
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });

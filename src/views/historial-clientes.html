@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Compras por Cliente - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/historial-clientes.html" class="active"><i>🛒</i> Historial Clientes</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
+        </div>
+        
+        <!-- Información de usuario (se cargará dinámicamente) -->
+        <div id="user-info"></div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>🛒 Historial de Compras por Cliente</h1>
+            <p>Ver todas las compras realizadas por un cliente en el año</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Seleccionar Cliente</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="cliente-select">Cliente</label>
+                        <select id="cliente-select" onchange="cargarHistorialCliente()">
+                            <option value="">Seleccionar cliente...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="year-select">Año</label>
+                        <select id="year-select" onchange="cargarHistorialCliente()">
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="cliente-info" class="content-card" style="display: none;">
+            <div class="card-header">
+                <h3>📊 Resumen de Compras</h3>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>💰 Total Gastado</h3>
+                        <div class="value" id="total-gastado">$0.00</div>
+                        <div class="trend">
+                            En el período seleccionado
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>🛒 Total Compras</h3>
+                        <div class="value" id="total-compras">0</div>
+                        <div class="trend">
+                            Ventas realizadas
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>📦 Productos</h3>
+                        <div class="value" id="total-productos">0</div>
+                        <div class="trend">
+                            Productos comprados
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>💳 Promedio</h3>
+                        <div class="value" id="promedio-compra">$0.00</div>
+                        <div class="trend">
+                            Por compra
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="historial-container" class="content-card" style="display: none;">
+            <div class="card-header">
+                <h3>📋 Historial de Compras</h3>
+                <div class="card-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="exportarHistorialCSV()">
+                        📊 CSV
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="exportarHistorialPDF()">
+                        📄 PDF
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th># Venta</th>
+                            <th>Fecha</th>
+                            <th>Productos</th>
+                            <th>Items</th>
+                            <th>Subtotal</th>
+                            <th>IVA</th>
+                            <th>Descuento</th>
+                            <th>Total</th>
+                            <th>Método</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historial-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Modal de detalles de venta -->
+        <div id="venta-detalles-modal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3 id="venta-detalles-title">Detalles de Venta</h3>
+                    <button class="modal-close" onclick="closeModal('venta-detalles-modal')">×</button>
+                </div>
+                <div class="modal-body">
+                    <div id="venta-detalles-content">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/historialClientes.js"></script>
+</body>
+</html>

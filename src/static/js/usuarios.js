@@ -1,11 +1,9 @@
-const API_BASE_URL = 'http://localhost:3000/api';
-
 let usuarios = [];
 
 // Cargar usuarios
 async function loadUsuarios() {
     try {
-        usuarios = await fetchAPI('/usuarios');
+        usuarios = await fetchAPIAuth('/usuarios');
         renderUsuarios(usuarios);
     } catch (error) {
         console.error('Error cargando usuarios:', error);
@@ -78,8 +76,8 @@ function openUsuarioModal() {
 // Editar usuario
 async function editUsuario(id) {
     try {
-        const usuario = await fetchAPI(`/usuarios/${id}`);
-        
+        const usuario = await fetchAPIAuth(`/usuarios/${id}`);
+
         document.getElementById('usuario-modal-title').textContent = 'Editar Usuario';
         document.getElementById('usuario-id').value = usuario.id_usuario;
         document.getElementById('usuario-username').value = usuario.username;
@@ -90,63 +88,116 @@ async function editUsuario(id) {
         document.getElementById('usuario-password').required = false;
         document.getElementById('usuario-password').value = '';
         document.getElementById('password-hint').textContent = 'Dejar en blanco para mantener el mismo';
-        
+
         openModal('usuario-modal');
     } catch (error) {
         console.error('Error cargando usuario:', error);
-        showAlert('Error al cargar el usuario', 'danger');
+        showNotification('Error al cargar el usuario', 'error');
     }
 }
 
 // Guardar usuario
 async function saveUsuario() {
-    const id = document.getElementById('usuario-id').value;
-    const username = document.getElementById('usuario-username').value.trim();
-    const password = document.getElementById('usuario-password').value;
-    const nombre = document.getElementById('usuario-nombre').value.trim();
-    const email = document.getElementById('usuario-email').value.trim();
-    const rol = document.getElementById('usuario-rol').value;
-    const activo = document.getElementById('usuario-activo').value === 'true';
-    
+    console.log('🔍 Obteniendo elementos del formulario...');
+
+    const idElement = document.getElementById('usuario-id');
+    const usernameElement = document.getElementById('usuario-username');
+    const passwordElement = document.getElementById('usuario-password');
+    const nombreElement = document.getElementById('usuario-nombre');
+    const emailElement = document.getElementById('usuario-email');
+    const rolElement = document.getElementById('usuario-rol');
+    const activoElement = document.getElementById('usuario-activo');
+
+    console.log('🔍 Elementos encontrados:', {
+        idElement: !!idElement,
+        usernameElement: !!usernameElement,
+        passwordElement: !!passwordElement,
+        nombreElement: !!nombreElement,
+        emailElement: !!emailElement,
+        rolElement: !!rolElement,
+        activoElement: !!activoElement
+    });
+
+    if (!usernameElement || !nombreElement) {
+        console.error('❌ No se encontraron elementos del formulario');
+        showNotification('Error: No se encontraron elementos del formulario', 'error');
+        return;
+    }
+
+    const id = idElement ? idElement.value : '';
+    const username = usernameElement.value.trim();
+    const password = passwordElement ? passwordElement.value : '';
+    const nombre = nombreElement.value.trim();
+    const email = emailElement ? emailElement.value.trim() : '';
+    const rol = rolElement ? rolElement.value : '';
+    const activoStr = activoElement ? activoElement.value : 'true';
+    const activo = activoStr === 'true';
+
+    console.log('💾 Guardando usuario:', {
+        id,
+        username,
+        nombre,
+        email,
+        rol,
+        activoStr,
+        activo,
+        activoType: typeof activo,
+        hasPassword: !!password
+    });
+
     if (!username || !nombre) {
-        showAlert('Username y nombre son obligatorios', 'warning');
+        showNotification('Username y nombre son obligatorios', 'warning');
         return;
     }
-    
+
     if (!id && password.length < 6) {
-        showAlert('El password debe tener al menos 6 caracteres', 'warning');
+        showNotification('El password debe tener al menos 6 caracteres', 'warning');
         return;
     }
-    
+
     try {
-        const data = { username, nombre, email, rol, activo };
+        const data = {
+            username,
+            nombre,
+            email,
+            rol,
+            activo
+        };
         if (password) {
             data.password = password;
         }
-        
+
+        console.log('📤 Datos a enviar:', data);
+        console.log('📤 Tipo de activo en data:', typeof data.activo);
+
         let result;
         if (id) {
-            result = await fetchAPI(`/usuarios/${id}`, {
+            console.log('🔄 Actualizando usuario ID:', id);
+            result = await fetchAPIAuth(`/usuarios/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Usuario actualizado exitosamente', 'success');
+            console.log('✅ Usuario actualizado:', result);
+            showNotification('Usuario actualizado exitosamente', 'success');
         } else {
-            result = await fetchAPI('/usuarios', {
+            console.log('🔄 Creando nuevo usuario');
+            result = await fetchAPIAuth('/usuarios', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Usuario creado exitosamente', 'success');
+            console.log('✅ Usuario creado:', result);
+            showNotification('Usuario creado exitosamente', 'success');
         }
-        
+
         closeModal('usuario-modal');
         await loadUsuarios();
-        
+
     } catch (error) {
-        console.error('Error guardando usuario:', error);
-        showAlert('Error al guardar el usuario', 'danger');
+        console.error('❌ Error guardando usuario:', error);
+        console.error('❌ Error name:', error.name);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error stack:', error.stack);
+        showNotification(error.message || 'Error al guardar el usuario', 'error');
     }
 }
 
@@ -161,25 +212,24 @@ function openPasswordModal(id) {
 async function cambiarPassword() {
     const id = document.getElementById('password-usuario-id').value;
     const nuevoPassword = document.getElementById('nuevo-password').value;
-    
+
     if (!nuevoPassword || nuevoPassword.length < 6) {
-        showAlert('El password debe tener al menos 6 caracteres', 'warning');
+        showNotification('El password debe tener al menos 6 caracteres', 'warning');
         return;
     }
-    
+
     try {
-        await fetchAPI(`/usuarios/${id}/password`, {
+        await fetchAPIAuth(`/usuarios/${id}/password`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: nuevoPassword })
+            body: { password: nuevoPassword }
         });
-        
-        showAlert('Password actualizado exitosamente', 'success');
+
+        showNotification('Password actualizado exitosamente', 'success');
         closeModal('password-modal');
-        
+
     } catch (error) {
         console.error('Error actualizando password:', error);
-        showAlert('Error al actualizar el password', 'danger');
+        showNotification('Error al actualizar el password', 'error');
     }
 }
 
@@ -188,18 +238,18 @@ async function deleteUsuario(id) {
     if (!confirm('¿Está seguro de eliminar este usuario?')) {
         return;
     }
-    
+
     try {
-        await fetchAPI(`/usuarios/${id}`, {
+        await fetchAPIAuth(`/usuarios/${id}`, {
             method: 'DELETE'
         });
-        
-        showAlert('Usuario eliminado exitosamente', 'success');
+
+        showNotification('Usuario eliminado exitosamente', 'success');
         await loadUsuarios();
-        
+
     } catch (error) {
         console.error('Error eliminando usuario:', error);
-        showAlert('Error al eliminar el usuario', 'danger');
+        showNotification('Error al eliminar el usuario', 'error');
     }
 }
 

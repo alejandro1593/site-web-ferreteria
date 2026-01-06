@@ -16,16 +16,20 @@
         </div>
         
         <div class="sidebar-nav">
-            <a href="dashboard.html"><i>📊</i> Dashboard</a>
-            <a href="categorias.html"><i>📁</i> Categorías</a>
-            <a href="proveedores.html" class="active"><i>🏢</i> Proveedores</a>
-            <a href="clientes.html"><i>👥</i> Clientes</a>
-            <a href="usuarios.html"><i>👤</i> Usuarios</a>
-            <a href="productos.html"><i>📦</i> Productos</a>
-            <a href="ventas.html"><i>💰</i> Ventas</a>
-            <a href="reportes.html"><i>📈</i> Reportes</a>
-            <a href="api.html"><i>🔧</i> API Docs</a>
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html" class="active"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
         </div>
+        
+        <!-- Información de usuario (se cargará dinámicamente) -->
+        <div id="user-info"></div>
     </nav>
     
     <main class="main-content">
@@ -113,7 +117,8 @@
         </div>
     </div>
     
-    <script src="js/app.js"></script>
-    <script src="js/proveedores.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/proveedores.js"></script>
 </body>
 </html>

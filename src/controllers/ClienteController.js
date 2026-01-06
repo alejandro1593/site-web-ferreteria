@@ -27,7 +27,7 @@ const ClienteController = {
 
   // Crear nuevo cliente
   create: (req, res) => {
-    const { nombre, apellido, dni, telefono, email, direccion } = req.body;
+    const { nombre, apellido, dni, telefono, email, direccion } = req.body || {};
     
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });
@@ -47,7 +47,7 @@ const ClienteController = {
   // Actualizar cliente
   update: (req, res) => {
     const { id } = req.params;
-    const { nombre, apellido, dni, telefono, email, direccion } = req.body;
+    const { nombre, apellido, dni, telefono, email, direccion } = req.body || {};
     
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });

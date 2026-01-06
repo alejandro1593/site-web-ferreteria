@@ -1,5 +1,3 @@
-const API_BASE_URL = 'http://localhost:3000';
-
 let allProducts = [];
 let categories = [];
 
@@ -31,8 +29,7 @@ const categoryNames = {
 // Cargar categorías
 async function loadCategories() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/categorias`);
-        categories = await response.json();
+        categories = await fetchAPIAuth('/categorias');
         createFilterButtons();
     } catch (error) {
         console.error('Error cargando categorías:', error);
@@ -43,7 +40,7 @@ async function loadCategories() {
 function createFilterButtons() {
     const filterButtonsContainer = document.getElementById('filter-buttons');
     filterButtonsContainer.innerHTML = '<button class="filter-btn active" data-category="all">Todos</button>';
-    
+
     categories.forEach(cat => {
         const button = document.createElement('button');
         button.className = 'filter-btn';
@@ -52,7 +49,7 @@ function createFilterButtons() {
         button.addEventListener('click', () => filterByCategory(cat.id_categoria));
         filterButtonsContainer.appendChild(button);
     });
-    
+
     // Agregar event listener al botón "Todos"
     document.querySelector('[data-category="all"]').addEventListener('click', showAllProducts);
 }
@@ -60,9 +57,8 @@ function createFilterButtons() {
 // Cargar productos
 async function loadProducts() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/productos`);
-        allProducts = await response.json();
-        
+        allProducts = await fetchAPIAuth('/productos');
+
         document.getElementById('total-products').textContent = allProducts.length;
         displayProducts(allProducts);
     } catch (error) {

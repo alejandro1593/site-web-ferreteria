@@ -18,37 +18,43 @@
         </div>
         
         <div class="sidebar-nav">
-            <a href="dashboard.html" class="active">
+            <a href="/dashboard.html" class="active">
                 <i>📊</i> Dashboard
             </a>
-            <a href="categorias.html">
+            <a href="/categorias.html">
                 <i>📁</i> Categorías
             </a>
-            <a href="proveedores.html">
+            <a href="/proveedores.html">
                 <i>🏢</i> Proveedores
             </a>
-            <a href="clientes.html">
+            <a href="/clientes.html">
                 <i>👥</i> Clientes
             </a>
-            <a href="usuarios.html">
+            <a href="/usuarios.html">
                 <i>👤</i> Usuarios
             </a>
-            <a href="productos.html">
+            <a href="/productos.html">
                 <i>📦</i> Productos
             </a>
-            <a href="ventas.html">
+            <a href="/ventas.html">
                 <i>💰</i> Ventas
             </a>
-            <a href="reportes.html">
+            <a href="/historial-clientes.html">
+                <i>🛒</i> Historial Clientes
+            </a>
+            <a href="/reportes.html">
                 <i>📈</i> Reportes
             </a>
-            <a href="api.html">
+            <a href="/api.html">
                 <i>🔧</i> API Docs
             </a>
-            <a href="products.html">
+            <a href="/products.html">
                 <i>🛍️</i> Catálogo
             </a>
         </div>
+        
+        <!-- Información de usuario (se cargará dinámicamente) -->
+        <div id="user-info"></div>
     </nav>
     
     <!-- Contenido Principal -->
@@ -60,6 +66,35 @@
         
         <div class="stats-grid" id="stats-grid">
             <!-- Estadísticas se cargarán dinámicamente -->
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📱 Redes Sociales</h3>
+                <button class="btn btn-primary btn-sm" onclick="openSocialMediaModal()">
+                    ⚙️ Configurar
+                </button>
+            </div>
+            <div class="card-body social-media-section">
+                <div class="social-media-grid">
+                    <a id="social-instagram" href="https://instagram.com" target="_blank" class="social-card instagram">
+                        <span class="social-icon">📸</span>
+                        <span class="social-name">Instagram</span>
+                    </a>
+                    <a id="social-facebook" href="https://facebook.com" target="_blank" class="social-card facebook">
+                        <span class="social-icon">📘</span>
+                        <span class="social-name">Facebook</span>
+                    </a>
+                    <a id="social-whatsapp" href="#" class="social-card whatsapp">
+                        <span class="social-icon">💬</span>
+                        <span class="social-name">WhatsApp</span>
+                    </a>
+                    <a id="social-twitter" href="https://twitter.com" target="_blank" class="social-card twitter">
+                        <span class="social-icon">🐦</span>
+                        <span class="social-name">Twitter</span>
+                    </a>
+                </div>
+            </div>
         </div>
         
         <div class="content-card">
@@ -93,7 +128,7 @@
         
         <div class="content-card">
             <div class="card-header">
-                <h3>📦 Productos con Stock Bajo</h3>
+                <h3>📦 Productos con Stock Inferior a 20</h3>
                 <button class="btn btn-warning btn-sm" onclick="navigateTo('productos.html')">
                     Gestionar stock
                 </button>
@@ -106,13 +141,12 @@
                                 <th>Producto</th>
                                 <th>Código</th>
                                 <th>Stock Actual</th>
-                                <th>Stock Mínimo</th>
                                 <th>Estado</th>
                             </tr>
                         </thead>
                         <tbody id="low-stock-tbody">
                             <tr>
-                                <td colspan="5" class="loading-spinner">Cargando...</td>
+                                <td colspan="4" class="loading-spinner">Cargando...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -121,7 +155,42 @@
         </div>
     </main>
     
+    <!-- Modal de Configuración de Redes Sociales -->
+    <div id="social-media-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Configurar Redes Sociales</h3>
+                <button class="modal-close" onclick="closeModal('social-media-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="social-media-form">
+                    <div class="form-group">
+                        <label for="instagram-url">Instagram URL</label>
+                        <input type="url" id="instagram-url" placeholder="https://instagram.com/tu_usuario">
+                    </div>
+                    <div class="form-group">
+                        <label for="facebook-url">Facebook URL</label>
+                        <input type="url" id="facebook-url" placeholder="https://facebook.com/tu_pagina">
+                    </div>
+                    <div class="form-group">
+                        <label for="whatsapp-url">WhatsApp URL</label>
+                        <input type="url" id="whatsapp-url" placeholder="https://wa.me/1234567890">
+                    </div>
+                    <div class="form-group">
+                        <label for="twitter-url">Twitter URL</label>
+                        <input type="url" id="twitter-url" placeholder="https://twitter.com/tu_usuario">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('social-media-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveSocialMedia()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

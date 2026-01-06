@@ -149,6 +149,47 @@ const Venta = {
       WHERE fecha BETWEEN ? AND ? AND estado = 'completada'
     `;
     connection.query(sql, [fechaInicio, fechaFin], callback);
+  },
+
+  // Obtener historial de compras de un cliente con detalles
+  getHistorialCliente: (idCliente, fechaInicio, fechaFin, callback) => {
+    const sql = `
+      SELECT 
+        v.id_venta,
+        v.fecha,
+        v.subtotal,
+        v.iva,
+        v.descuento,
+        v.total,
+        v.metodo_pago,
+        v.estado,
+        GROUP_CONCAT(CONCAT(vd.cantidad, 'x ', p.nombre) SEPARATOR ', ') as productos_resumen,
+        COUNT(vd.id_detalle) as total_items
+      FROM ventas v
+      LEFT JOIN venta_detalle vd ON v.id_venta = vd.id_venta
+      LEFT JOIN productos p ON vd.id_producto = p.id_producto
+      WHERE v.id_cliente = ? AND v.fecha BETWEEN ? AND ?
+      GROUP BY v.id_venta
+      ORDER BY v.fecha DESC
+    `;
+    connection.query(sql, [idCliente, fechaInicio, fechaFin], callback);
+  },
+
+  // Obtener resumen de compras de un cliente por período
+  getResumenCliente: (idCliente, fechaInicio, fechaFin, callback) => {
+    const sql = `
+      SELECT 
+        COUNT(v.id_venta) as total_compras,
+        SUM(v.total) as total_gastado,
+        SUM(v.subtotal) as total_subtotal,
+        SUM(v.iva) as total_iva,
+        AVG(v.total) as promedio_compra,
+        SUM(vd.cantidad) as total_productos
+      FROM ventas v
+      LEFT JOIN venta_detalle vd ON v.id_venta = vd.id_venta
+      WHERE v.id_cliente = ? AND v.fecha BETWEEN ? AND ? AND v.estado = 'completada'
+    `;
+    connection.query(sql, [idCliente, fechaInicio, fechaFin], callback);
   }
 };
 

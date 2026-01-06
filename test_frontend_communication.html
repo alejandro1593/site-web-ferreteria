@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Comunicación Frontend-Backend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test de Comunicación Frontend-Backend</h1>
+        <p>Esta página prueba la comunicación entre el frontend y el backend para identificar problemas con datos undefined.</p>
+
+        <h2>1. Login</h2>
+        <div class="form-group">
+            <label for="login-username">Username:</label>
+            <input type="text" id="login-username" value="admin">
+        </div>
+        <div class="form-group">
+            <label for="login-password">Password:</label>
+            <input type="password" id="login-password" value="admin123">
+        </div>
+        <button onclick="testLogin()">1. Probar Login</button>
+        <div id="login-log" class="log"></div>
+
+        <h2>2. Obtener Usuarios</h2>
+        <button onclick="testGetUsuarios()">2. Obtener Usuarios</button>
+        <div id="get-usuarios-log" class="log"></div>
+
+        <h2>3. Crear Usuario (Simular Formulario)</h2>
+        <div class="form-group">
+            <label for="test-username">Username:</label>
+            <input type="text" id="test-username" value="test_user_frontend">
+        </div>
+        <div class="form-group">
+            <label for="test-password">Password:</label>
+            <input type="password" id="test-password" value="test123">
+        </div>
+        <div class="form-group">
+            <label for="test-nombre">Nombre:</label>
+            <input type="text" id="test-nombre" value="Usuario Test Frontend">
+        </div>
+        <div class="form-group">
+            <label for="test-email">Email:</label>
+            <input type="email" id="test-email" value="test@test.com">
+        </div>
+        <div class="form-group">
+            <label for="test-rol">Rol:</label>
+            <select id="test-rol">
+                <option value="vendedor" selected>Vendedor</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="test-activo">Activo:</label>
+            <select id="test-activo">
+                <option value="true" selected>Activo</option>
+                <option value="false">Inactivo</option>
+            </select>
+        </div>
+        <button onclick="testCreateUsuario()">3. Crear Usuario</button>
+        <div id="create-usuario-log" class="log"></div>
+
+        <h2>4. Verificar DOM Elements</h2>
+        <button onclick="testDOMElements()">4. Verificar Elementos del DOM</button>
+        <div id="dom-log" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        function log(logId, message, type = 'info') {
+            const logElement = document.getElementById(logId);
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="${type}">[${timestamp}]</span> ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog(logId) {
+            document.getElementById(logId).innerHTML = '';
+        }
+
+        async function testLogin() {
+            clearLog('login-log');
+            log('login-log', '=== INICIANDO PRUEBA DE LOGIN ===', 'info');
+
+            const usernameElement = document.getElementById('login-username');
+            const passwordElement = document.getElementById('login-password');
+
+            log('login-log', `Elemento username encontrado: ${!!usernameElement}`, 'info');
+            log('login-log', `Elemento password encontrado: ${!!passwordElement}`, 'info');
+
+            if (!usernameElement || !passwordElement) {
+                log('login-log', '❌ ERROR: No se encontraron elementos del formulario', 'error');
+                return;
+            }
+
+            const username = usernameElement.value.trim();
+            const password = passwordElement.value.trim();
+
+            log('login-log', `Username: ${username}`, 'info');
+            log('login-log', `Password: ${password ? '***' : 'VACÍO'}`, 'info');
+
+            try {
+                log('login-log', `📡 Enviando petición a ${API_BASE_URL}/auth/login...`, 'info');
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                log('login-log', `📡 Response status: ${response.status}`, 'info');
+                log('login-log', `📡 Response ok: ${response.ok}`, 'info');
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('login-log', `❌ ERROR: ${response.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                log('login-log', `✅ Login exitoso`, 'success');
+                log('login-log', `Token: ${data.token.substring(0, 50)}...`, 'info');
+                localStorage.setItem('test_token', data.token);
+                log('login-log', `Token guardado en localStorage`, 'success');
+            } catch (error) {
+                log('login-log', `❌ ERROR: ${error.message}`, 'error');
+                log('login-log', `Stack: ${error.stack}`, 'error');
+            }
+        }
+
+        async function testGetUsuarios() {
+            clearLog('get-usuarios-log');
+            log('get-usuarios-log', '=== OBTENIENDO USUARIOS ===', 'info');
+
+            const token = localStorage.getItem('test_token');
+            if (!token) {
+                log('get-usuarios-log', '❌ ERROR: No hay token. Primero haz login.', 'error');
+                return;
+            }
+
+            try {
+                log('get-usuarios-log', `📡 Enviando petición a ${API_BASE_URL}/usuarios...`, 'info');
+                const response = await fetch(`${API_BASE_URL}/usuarios`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log('get-usuarios-log', `📡 Response status: ${response.status}`, 'info');
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('get-usuarios-log', `❌ ERROR: ${response.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                log('get-usuarios-log', `✅ ${data.length} usuarios obtenidos`, 'success');
+                log('get-usuarios-log', `Primer usuario: ${JSON.stringify(data[0])}`, 'info');
+            } catch (error) {
+                log('get-usuarios-log', `❌ ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateUsuario() {
+            clearLog('create-usuario-log');
+            log('create-usuario-log', '=== CREANDO USUARIO ===', 'info');
+
+            const usernameElement = document.getElementById('test-username');
+            const passwordElement = document.getElementById('test-password');
+            const nombreElement = document.getElementById('test-nombre');
+            const emailElement = document.getElementById('test-email');
+            const rolElement = document.getElementById('test-rol');
+            const activoElement = document.getElementById('test-activo');
+
+            log('create-usuario-log', 'Verificando elementos del DOM:', 'info');
+            log('create-usuario-log', `  usernameElement: ${!!usernameElement}`, 'info');
+            log('create-usuario-log', `  passwordElement: ${!!passwordElement}`, 'info');
+            log('create-usuario-log', `  nombreElement: ${!!nombreElement}`, 'info');
+            log('create-usuario-log', `  emailElement: ${!!emailElement}`, 'info');
+            log('create-usuario-log', `  rolElement: ${!!rolElement}`, 'info');
+            log('create-usuario-log', `  activoElement: ${!!activoElement}`, 'info');
+
+            if (!usernameElement || !nombreElement) {
+                log('create-usuario-log', '❌ ERROR: No se encontraron elementos requeridos', 'error');
+                return;
+            }
+
+            const username = usernameElement.value.trim();
+            const password = passwordElement.value.trim();
+            const nombre = nombreElement.value.trim();
+            const email = emailElement ? emailElement.value.trim() : '';
+            const rol = rolElement ? rolElement.value : 'vendedor';
+            const activoStr = activoElement ? activoElement.value : 'true';
+            const activo = activoStr === 'true';
+
+            log('create-usuario-log', 'Valores obtenidos:', 'info');
+            log('create-usuario-log', `  username: ${username}`, 'info');
+            log('create-usuario-log', `  password: ${password ? '***' : 'VACÍO'}`, 'info');
+            log('create-usuario-log', `  nombre: ${nombre}`, 'info');
+            log('create-usuario-log', `  email: ${email || 'VACÍO'}`, 'info');
+            log('create-usuario-log', `  rol: ${rol}`, 'info');
+            log('create-usuario-log', `  activoStr: ${activoStr}`, 'info');
+            log('create-usuario-log', `  activo: ${activo}`, 'info');
+
+            if (!username || !nombre) {
+                log('create-usuario-log', '❌ ERROR: Username y nombre son requeridos', 'error');
+                return;
+            }
+
+            const data = {
+                username,
+                nombre,
+                email,
+                rol,
+                activo
+            };
+            if (password) {
+                data.password = password;
+            }
+
+            log('create-usuario-log', 'Datos a enviar:', 'info');
+            log('create-usuario-log', JSON.stringify(data, null, 2), 'info');
+
+            const token = localStorage.getItem('test_token');
+            if (!token) {
+                log('create-usuario-log', '❌ ERROR: No hay token. Primero haz login.', 'error');
+                return;
+            }
+
+            try {
+                log('create-usuario-log', `📡 Enviando petición a ${API_BASE_URL}/usuarios...`, 'info');
+                const response = await fetch(`${API_BASE_URL}/usuarios`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                log('create-usuario-log', `📡 Response status: ${response.status}`, 'info');
+                log('create-usuario-log', `📡 Response ok: ${response.ok}`, 'info');
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('create-usuario-log', `❌ ERROR: ${response.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                const result = await response.json();
+                log('create-usuario-log', `✅ Usuario creado exitosamente`, 'success');
+                log('create-usuario-log', `ID: ${result.id}`, 'success');
+            } catch (error) {
+                log('create-usuario-log', `❌ ERROR: ${error.message}`, 'error');
+                log('create-usuario-log', `Stack: ${error.stack}`, 'error');
+            }
+        }
+
+        function testDOMElements() {
+            clearLog('dom-log');
+            log('dom-log', '=== VERIFICANDO ELEMENTOS DEL DOM ===', 'info');
+
+            const elements = [
+                'login-username',
+                'login-password',
+                'test-username',
+                'test-password',
+                'test-nombre',
+                'test-email',
+                'test-rol',
+                'test-activo'
+            ];
+
+            elements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    log('dom-log', `✅ Elemento #${id} encontrado`, 'success');
+                } else {
+                    log('dom-log', `❌ Elemento #${id} NO encontrado`, 'error');
+                }
+            });
+        }
+
+        // Verificar al cargar
+        window.addEventListener('load', () => {
+            testDOMElements();
+        });
+    </script>
+</body>
+</html>

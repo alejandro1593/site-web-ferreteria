@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Creación de Producto</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test de Creación de Producto</h1>
+        <p>Esta página prueba la función saveProducto() para identificar problemas.</p>
+
+        <h2>1. Login</h2>
+        <div class="form-group">
+            <label for="login-username">Username:</label>
+            <input type="text" id="login-username" value="admin">
+        </div>
+        <div class="form-group">
+            <label for="login-password">Password:</label>
+            <input type="password" id="login-password" value="admin123">
+        </div>
+        <button onclick="testLogin()">Login</button>
+        <div id="login-log" class="log"></div>
+
+        <h2>2. Cargar Categorías y Proveedores</h2>
+        <button onclick="testLoadCategoriasProveedores()">Cargar Categorías y Proveedores</button>
+        <div id="load-log" class="log"></div>
+
+        <h2>3. Crear Producto (Simular Formulario)</h2>
+        <div class="form-group">
+            <label for="test-nombre">Nombre:</label>
+            <input type="text" id="test-nombre" value="Martillo de Prueba">
+        </div>
+        <div class="form-group">
+            <label for="test-codigo">Código:</label>
+            <input type="text" id="test-codigo" value="TEST-001">
+        </div>
+        <div class="form-group">
+            <label for="test-descripcion">Descripción:</label>
+            <textarea id="test-descripcion" rows="2">Martillo de prueba automática</textarea>
+        </div>
+        <div class="form-group">
+            <label for="test-precio-compra">Precio Compra:</label>
+            <input type="number" id="test-precio-compra" value="50.00" step="0.01">
+        </div>
+        <div class="form-group">
+            <label for="test-precio-venta">Precio Venta:</label>
+            <input type="number" id="test-precio-venta" value="75.00" step="0.01">
+        </div>
+        <div class="form-group">
+            <label for="test-stock-actual">Stock Actual:</label>
+            <input type="number" id="test-stock-actual" value="10">
+        </div>
+        <div class="form-group">
+            <label for="test-stock-minimo">Stock Mínimo:</label>
+            <input type="number" id="test-stock-minimo" value="5">
+        </div>
+        <div class="form-group">
+            <label for="test-categoria">Categoría:</label>
+            <select id="test-categoria">
+                <option value="">Seleccionar...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="test-proveedor">Proveedor:</label>
+            <select id="test-proveedor">
+                <option value="">Seleccionar...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="test-activo">Activo:</label>
+            <select id="test-activo">
+                <option value="true" selected>Activo</option>
+                <option value="false">Inactivo</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="test-imagen">URL Imagen:</label>
+            <input type="url" id="test-imagen" value="https://via.placeholder.com/400?text=Martillo">
+        </div>
+        <button onclick="testCreateProducto()">Crear Producto</button>
+        <div id="create-log" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api';
+        let categorias = [];
+        let proveedores = [];
+
+        function log(logId, message, type = 'info') {
+            const logElement = document.getElementById(logId);
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="${type}">[${timestamp}]</span> ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog(logId) {
+            document.getElementById(logId).innerHTML = '';
+        }
+
+        async function testLogin() {
+            clearLog('login-log');
+            log('login-log', '=== INICIANDO LOGIN ===', 'info');
+
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+
+            try {
+                log('login-log', `📡 Enviando petición a ${API_BASE_URL}/auth/login...`, 'info');
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                log('login-log', `📡 Response status: ${response.status}`, 'info');
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('login-log', `❌ ERROR: ${response.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                log('login-log', `✅ Login exitoso`, 'success');
+                localStorage.setItem('test_token_producto', data.token);
+                log('login-log', `Token guardado en localStorage`, 'success');
+            } catch (error) {
+                log('login-log', `❌ ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLoadCategoriasProveedores() {
+            clearLog('load-log');
+            log('load-log', '=== CARGANDO CATEGORÍAS Y PROVEEDORES ===', 'info');
+
+            const token = localStorage.getItem('test_token_producto');
+            if (!token) {
+                log('load-log', '❌ ERROR: No hay token. Primero haz login.', 'error');
+                return;
+            }
+
+            try {
+                // Cargar categorías
+                log('load-log', 'Cargando categorías...', 'info');
+                const catResponse = await fetch(`${API_BASE_URL}/categorias`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!catResponse.ok) {
+                    const errorText = await catResponse.text();
+                    log('load-log', `❌ ERROR cargando categorías: ${catResponse.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                categorias = await catResponse.json();
+                log('load-log', `✅ ${categorias.length} categorías cargadas`, 'success');
+
+                // Llenar select
+                const catSelect = document.getElementById('test-categoria');
+                catSelect.innerHTML = '<option value="">Seleccionar...</option>' +
+                    categorias.map(cat => `<option value="${cat.id_categoria}">${cat.nombre}</option>`).join('');
+
+                // Cargar proveedores
+                log('load-log', 'Cargando proveedores...', 'info');
+                const provResponse = await fetch(`${API_BASE_URL}/proveedores`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!provResponse.ok) {
+                    const errorText = await provResponse.text();
+                    log('load-log', `❌ ERROR cargando proveedores: ${provResponse.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                proveedores = await provResponse.json();
+                log('load-log', `✅ ${proveedores.length} proveedores cargados`, 'success');
+
+                // Llenar select
+                const provSelect = document.getElementById('test-proveedor');
+                provSelect.innerHTML = '<option value="">Seleccionar...</option>' +
+                    proveedores.map(prov => `<option value="${prov.id_proveedor}">${prov.nombre}</option>`).join('');
+
+            } catch (error) {
+                log('load-log', `❌ ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateProducto() {
+            clearLog('create-log');
+            log('create-log', '=== CREANDO PRODUCTO ===', 'info');
+
+            const token = localStorage.getItem('test_token_producto');
+            if (!token) {
+                log('create-log', '❌ ERROR: No hay token. Primero haz login.', 'error');
+                return;
+            }
+
+            const nombre = document.getElementById('test-nombre').value.trim();
+            const codigo = document.getElementById('test-codigo').value.trim();
+            const descripcion = document.getElementById('test-descripcion').value.trim();
+            const precioCompra = document.getElementById('test-precio-compra').value;
+            const precioVenta = document.getElementById('test-precio-venta').value;
+            const stockActual = document.getElementById('test-stock-actual').value;
+            const stockMinimo = document.getElementById('test-stock-minimo').value;
+            const categoria = document.getElementById('test-categoria').value;
+            const proveedor = document.getElementById('test-proveedor').value;
+            const activo = document.getElementById('test-activo').value;
+            const imagen = document.getElementById('test-imagen').value.trim();
+
+            log('create-log', 'Valores obtenidos:', 'info');
+            log('create-log', `  nombre: ${nombre}`, 'info');
+            log('create-log', `  precio_venta: ${precioVenta}`, 'info');
+
+            if (!nombre || !precioVenta) {
+                log('create-log', '❌ ERROR: Nombre y precio de venta son requeridos', 'error');
+                return;
+            }
+
+            const data = {
+                nombre,
+                descripcion,
+                codigo,
+                precio_compra: parseFloat(precioCompra) || null,
+                precio_venta: parseFloat(precioVenta),
+                stock_actual: parseInt(stockActual) || 0,
+                stock_minimo: parseInt(stockMinimo) || 0,
+                id_categoria: categoria ? parseInt(categoria) : null,
+                id_proveedor: proveedor ? parseInt(proveedor) : null,
+                activo: activo === 'true'
+            };
+
+            if (imagen) {
+                data.imagen = imagen;
+            } else {
+                data.imagen = 'https://via.placeholder.com/400?text=Sin+Imagen';
+            }
+
+            log('create-log', 'Datos a enviar:', 'info');
+            log('create-log', JSON.stringify(data, null, 2), 'info');
+
+            try {
+                log('create-log', `📡 Enviando petición a ${API_BASE_URL}/productos...`, 'info');
+                const response = await fetch(`${API_BASE_URL}/productos`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                log('create-log', `📡 Response status: ${response.status}`, 'info');
+                log('create-log', `📡 Response ok: ${response.ok}`, 'info');
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('create-log', `❌ ERROR: ${response.status}`, 'error');
+                    log('create-log', `Response: ${errorText}`, 'error');
+                    return;
+                }
+
+                const result = await response.json();
+                log('create-log', `✅ Producto creado exitosamente`, 'success');
+                log('create-log', `ID: ${result.id}`, 'success');
+                log('create-log', `Message: ${result.message}`, 'success');
+            } catch (error) {
+                log('create-log', `❌ ERROR: ${error.message}`, 'error');
+                log('create-log', `Stack: ${error.stack}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

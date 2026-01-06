@@ -1,19 +1,28 @@
 const API_BASE_URL = 'http://localhost:3000/api';
 
 async function fetchAPI(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    let url = endpoint;
+    
+    // Si url no empieza con http://, agregar API_BASE_URL
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `${API_BASE_URL}${endpoint}`;
+    }
+    
+    console.log(`🌐 fetchAPI: ${url}`);
     
     const defaultOptions = {
         headers: {
             'Content-Type': 'application/json'
         }
     };
-    
-    const finalOptions = { ...defaultOptions, ...options };
-    
+
+    const finalOptions = { ...options };
+
     if (options.body && typeof options.body === 'object') {
         finalOptions.body = JSON.stringify(options.body);
     }
+
+    finalOptions.headers = { ...defaultOptions.headers, ...options.headers };
     
     try {
         const response = await fetch(url, finalOptions);
@@ -22,9 +31,115 @@ async function fetchAPI(endpoint, options = {}) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        return await response.json();
+        const data = await response.json();
+        console.log(`✅ fetchAPI respuesta (${url}):`, Array.isArray(data) ? `${data.length} items` : 'objeto');
+        return data;
     } catch (error) {
-        console.error(`Error fetching ${url}:`, error);
+        console.error(`❌ Error fetching ${url}:`, error);
+        throw error;
+    }
+}
+
+// Función para hacer peticiones API con autenticación
+async function fetchAPIAuth(endpoint, options = {}) {
+    let url = endpoint;
+
+    // Si url no empieza con http://, agregar API_BASE_URL
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `${API_BASE_URL}${endpoint}`;
+    }
+
+    console.log(`🔐 fetchAPIAuth: ${url}`);
+
+    // Agregar token a los headers
+    if (!options.headers) {
+        options.headers = {};
+    }
+
+    const token = localStorage.getItem('token');
+    console.log(`🔑 Token existe: ${!!token}`);
+    if (token) {
+        console.log(`🔑 Token (primeros 50): ${token.substring(0, 50)}...`);
+        options.headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const finalOptions = { ...options };
+
+    if (options.body && typeof options.body === 'object') {
+        console.log(`📦 Body antes de stringify:`, options.body);
+        finalOptions.body = JSON.stringify(options.body);
+        console.log(`📦 Body después de stringify:`, finalOptions.body.substring(0, 200) + '...');
+    } else if (options.body) {
+        console.log(`📦 Body es string u otro tipo, usando directamente:`, typeof options.body);
+        finalOptions.body = options.body;
+    }
+
+    finalOptions.headers = { ...defaultOptions.headers, ...options.headers };
+
+    try {
+        console.log(`📡 Enviando petición a ${url}...`);
+        const response = await fetch(url, finalOptions);
+
+        console.log(`📡 Response status: ${response.status}`);
+        console.log(`📡 Response ok: ${response.ok}`);
+        console.log(`📡 Response statusText: ${response.statusText}`);
+
+        // Si el token expiró o es inválido (401)
+        if (response.status === 401) {
+            if (typeof logout === 'function') {
+                logout();
+            } else {
+                localStorage.removeItem('token');
+                localStorage.removeItem('usuario');
+                window.location.href = '/login.html';
+            }
+            throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente');
+        }
+
+        if (!response.ok) {
+            const status = response.status;
+            const statusText = response.statusText || 'Unknown Error';
+            console.log(`❌ Response not ok. Status: ${status}, StatusText: ${statusText}`);
+            const contentType = response.headers.get('content-type');
+            console.log('❌ Content-Type:', contentType);
+
+            try {
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    console.log('❌ Error data from server:', errorData);
+                    let errorMessage = errorData.error || errorData.message || '';
+                    if (errorData.details) {
+                        errorMessage += ` (${errorData.details})`;
+                    }
+                    if (!errorMessage) {
+                        errorMessage = `HTTP error! status: ${status} - ${statusText}`;
+                    }
+                    throw new Error(errorMessage);
+                } else {
+                    const errorText = await response.text();
+                    console.log('❌ Error text from server:', errorText);
+                    throw new Error(`HTTP error! status: ${status} - ${errorText || statusText}`);
+                }
+            } catch (jsonError) {
+                console.log('❌ Error parsing response:', jsonError);
+                throw new Error(`HTTP error! status: ${status} - ${statusText}`);
+            }
+        }
+
+        const data = await response.json();
+        console.log(`✅ fetchAPIAuth respuesta (${url}):`, Array.isArray(data) ? `${data.length} items` : 'objeto');
+        return data;
+    } catch (error) {
+        console.error(`❌ Error fetching auth ${url}:`, error);
+        console.error(`❌ Error name: ${error.name}`);
+        console.error(`❌ Error message: ${error.message}`);
+        console.error(`❌ Error stack:`, error.stack);
         throw error;
     }
 }
@@ -85,7 +200,7 @@ function showModal(title, content, onSave = null) {
     if (existingModal) {
         document.body.removeChild(existingModal);
     }
-    
+
     const modal = document.createElement('div');
     modal.id = 'dynamic-modal';
     modal.className = 'modal';
@@ -106,18 +221,27 @@ function showModal(title, content, onSave = null) {
             ` : ''}
         </div>
     `;
-    
+
     document.body.appendChild(modal);
     setTimeout(() => modal.classList.add('show'), 10);
 }
 
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('show');
-        setTimeout(() => {
-            document.body.removeChild(modal);
-        }, 300);
+
+    if (modalId === 'dynamic-modal') {
+        if (modal) {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                if (modal.parentNode) {
+                    document.body.removeChild(modal);
+                }
+            }, 300);
+        }
+    } else {
+        if (modal) {
+            modal.classList.remove('show');
+        }
     }
 }
 
@@ -320,6 +444,14 @@ function exportTableToCSV(tableId, filename) {
     }
 }
 
+// Abrir modal por ID
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('show');
+    }
+}
+
 function generateReport(reportData) {
     const reportId = Date.now();
     const filename = `reporte_${reportId}.txt`;
@@ -346,7 +478,8 @@ function generateReport(reportData) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Sistema de Ferretería - Frontend cargado');
+    console.log('✅ Sistema de Ferretería - Frontend cargado');
+    console.log('📦 API_BASE_URL:', API_BASE_URL);
     
     document.querySelectorAll('.menu-toggle').forEach(toggle => {
         toggle.addEventListener('click', () => {

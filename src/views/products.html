@@ -110,34 +110,32 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
+    <div class="main-content">
+        <div class="page-header">
             <h1>🏪 Catálogo de Productos</h1>
             <p>Explora todos los productos de la ferretería</p>
         </div>
-        
-        <div class="content">
-            <div class="info-box">
+
+        <div class="content-card">
+            <div class="card-header">
                 <h4>📊 Información</h4>
-                <ul>
-                    <li>Total de productos: <strong id="total-products">Cargando...</strong></li>
-                    <li>Filtrar por categoría para ver productos específicos</li>
-                    <li>Productos con stock bajo aparecen en rojo</li>
-                </ul>
+                <div class="card-actions">
+                    <div class="filter-buttons" id="filter-buttons">
+                        <button class="btn btn-primary active" data-category="all">Todos</button>
+                    </div>
+                </div>
             </div>
-            
-            <div class="filter-buttons" id="filter-buttons">
-                <button class="filter-btn active" data-category="all">Todos</button>
+            <div class="card-body">
+                <div id="loading" class="loading">
+                    ⏳ Cargando productos...
+                </div>
+
+                <div class="products-grid" id="products-grid"></div>
             </div>
-            
-            <div id="loading" class="loading">
-                ⏳ Cargando productos...
-            </div>
-            
-            <div class="products-grid" id="products-grid"></div>
         </div>
     </div>
     
+    <script src="/static/js/app.js"></script>
     <script src="/static/js/products.js"></script>
 </body>
 </html>

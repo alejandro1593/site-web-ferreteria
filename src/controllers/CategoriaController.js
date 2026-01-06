@@ -27,7 +27,7 @@ const CategoriaController = {
 
   // Crear nueva categoría
   create: (req, res) => {
-    const { nombre, descripcion } = req.body;
+    const { nombre, descripcion } = req.body || {};
     
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });
@@ -47,7 +47,7 @@ const CategoriaController = {
   // Actualizar categoría
   update: (req, res) => {
     const { id } = req.params;
-    const { nombre, descripcion } = req.body;
+    const { nombre, descripcion } = req.body || {};
     
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es requerido' });

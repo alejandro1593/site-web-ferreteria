@@ -1,10 +1,8 @@
-const API_BASE_URL = 'http://localhost:3000/api';
-
 let proveedores = [];
 
 async function loadProveedores() {
     try {
-        proveedores = await fetchAPI('/proveedores');
+        proveedores = await fetchAPIAuth('/proveedores');
         renderProveedores(proveedores);
     } catch (error) {
         console.error('Error cargando proveedores:', error);
@@ -70,8 +68,8 @@ function openProveedorModal() {
 
 async function editProveedor(id) {
     try {
-        const proveedor = await fetchAPI(`/proveedores/${id}`);
-        
+        const proveedor = await fetchAPIAuth(`/proveedores/${id}`);
+
         document.getElementById('proveedor-modal-title').textContent = 'Editar Proveedor';
         document.getElementById('proveedor-id').value = proveedor.id_proveedor;
         document.getElementById('proveedor-nombre').value = proveedor.nombre;
@@ -79,11 +77,11 @@ async function editProveedor(id) {
         document.getElementById('proveedor-telefono').value = proveedor.telefono || '';
         document.getElementById('proveedor-email').value = proveedor.email || '';
         document.getElementById('proveedor-direccion').value = proveedor.direccion || '';
-        
+
         openModal('proveedor-modal');
     } catch (error) {
         console.error('Error cargando proveedor:', error);
-        showAlert('Error al cargar el proveedor', 'danger');
+        showNotification('Error al cargar el proveedor', 'error');
     }
 }
 
@@ -96,36 +94,34 @@ async function saveProveedor() {
     const direccion = document.getElementById('proveedor-direccion').value.trim();
     
     if (!nombre) {
-        showAlert('El nombre es obligatorio', 'warning');
+        showNotification('El nombre es obligatorio', 'warning');
         return;
     }
     
     try {
         const data = { nombre, contacto, telefono, email, direccion };
         let result;
-        
+
         if (id) {
-            result = await fetchAPI(`/proveedores/${id}`, {
+            result = await fetchAPIAuth(`/proveedores/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Proveedor actualizado exitosamente', 'success');
+            showNotification('Proveedor actualizado exitosamente', 'success');
         } else {
-            result = await fetchAPI('/proveedores', {
+            result = await fetchAPIAuth('/proveedores', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Proveedor creado exitosamente', 'success');
+            showNotification('Proveedor creado exitosamente', 'success');
         }
-        
+
         closeModal('proveedor-modal');
         await loadProveedores();
-        
+
     } catch (error) {
         console.error('Error guardando proveedor:', error);
-        showAlert('Error al guardar el proveedor', 'danger');
+        showNotification('Error al guardar el proveedor', 'error');
     }
 }
 
@@ -133,18 +129,18 @@ async function deleteProveedor(id) {
     if (!confirm('¿Está seguro de eliminar este proveedor?')) {
         return;
     }
-    
+
     try {
-        await fetchAPI(`/proveedores/${id}`, {
+        await fetchAPIAuth(`/proveedores/${id}`, {
             method: 'DELETE'
         });
-        
-        showAlert('Proveedor eliminado exitosamente', 'success');
+
+        showNotification('Proveedor eliminado exitosamente', 'success');
         await loadProveedores();
-        
+
     } catch (error) {
         console.error('Error eliminando proveedor:', error);
-        showAlert('Error al eliminar el proveedor', 'danger');
+        showNotification('Error al eliminar el proveedor', 'error');
     }
 }
 

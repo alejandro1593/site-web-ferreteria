@@ -1,11 +1,9 @@
-const API_BASE_URL = 'http://localhost:3000/api';
-
 let clientes = [];
 
 // Cargar clientes
 async function loadClientes() {
     try {
-        clientes = await fetchAPI('/clientes');
+        clientes = await fetchAPIAuth('/clientes');
         renderClientes(clientes);
     } catch (error) {
         console.error('Error cargando clientes:', error);
@@ -43,11 +41,14 @@ function renderClientes(data) {
             <td>${cli.telefono || '-'}</td>
             <td>${cli.email || '-'}</td>
             <td>
-                <button class="btn btn-info btn-sm" onclick="editCliente(${cli.id_cliente})">
-                    ✏️ Editar
+                <button class="btn btn-success btn-sm" onclick="verHistorialCliente(${cli.id_cliente})" title="Ver historial de compras">
+                    🛒 Historial
                 </button>
-                <button class="btn btn-danger btn-sm" onclick="deleteCliente(${cli.id_cliente})">
-                    🗑️ Eliminar
+                <button class="btn btn-info btn-sm" onclick="editCliente(${cli.id_cliente})" title="Editar">
+                    ✏️
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteCliente(${cli.id_cliente})" title="Eliminar">
+                    🗑️
                 </button>
             </td>
         </tr>
@@ -77,8 +78,8 @@ function openClienteModal() {
 // Editar cliente
 async function editCliente(id) {
     try {
-        const cliente = await fetchAPI(`/clientes/${id}`);
-        
+        const cliente = await fetchAPIAuth(`/clientes/${id}`);
+
         document.getElementById('cliente-modal-title').textContent = 'Editar Cliente';
         document.getElementById('cliente-id').value = cliente.id_cliente;
         document.getElementById('cliente-nombre').value = cliente.nombre;
@@ -87,11 +88,11 @@ async function editCliente(id) {
         document.getElementById('cliente-telefono').value = cliente.telefono || '';
         document.getElementById('cliente-email').value = cliente.email || '';
         document.getElementById('cliente-direccion').value = cliente.direccion || '';
-        
+
         openModal('cliente-modal');
     } catch (error) {
         console.error('Error cargando cliente:', error);
-        showAlert('Error al cargar el cliente', 'danger');
+        showNotification('Error al cargar el cliente', 'error');
     }
 }
 
@@ -106,36 +107,34 @@ async function saveCliente() {
     const direccion = document.getElementById('cliente-direccion').value.trim();
     
     if (!nombre) {
-        showAlert('El nombre es obligatorio', 'warning');
+        showNotification('El nombre es obligatorio', 'warning');
         return;
     }
     
     try {
         const data = { nombre, apellido, dni, telefono, email, direccion };
         let result;
-        
+
         if (id) {
-            result = await fetchAPI(`/clientes/${id}`, {
+            result = await fetchAPIAuth(`/clientes/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Cliente actualizado exitosamente', 'success');
+            showNotification('Cliente actualizado exitosamente', 'success');
         } else {
-            result = await fetchAPI('/clientes', {
+            result = await fetchAPIAuth('/clientes', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: data
             });
-            showAlert('Cliente creado exitosamente', 'success');
+            showNotification('Cliente creado exitosamente', 'success');
         }
-        
+
         closeModal('cliente-modal');
         await loadClientes();
-        
+
     } catch (error) {
         console.error('Error guardando cliente:', error);
-        showAlert('Error al guardar el cliente', 'danger');
+        showNotification('Error al guardar el cliente', 'error');
     }
 }
 
@@ -146,17 +145,23 @@ async function deleteCliente(id) {
     }
     
     try {
-        await fetchAPI(`/clientes/${id}`, {
+        await fetchAPIAuth(`/clientes/${id}`, {
             method: 'DELETE'
         });
-        
-        showAlert('Cliente eliminado exitosamente', 'success');
+
+        showNotification('Cliente eliminado exitosamente', 'success');
         await loadClientes();
-        
+
     } catch (error) {
         console.error('Error eliminando cliente:', error);
-        showAlert('Error al eliminar el cliente', 'danger');
+        showNotification('Error al eliminar el cliente', 'error');
     }
+}
+
+// Ver historial de compras del cliente
+function verHistorialCliente(idCliente) {
+    const currentYear = new Date().getFullYear();
+    window.location.href = `/historial-clientes.html?cliente=${idCliente}&anio=${currentYear}`;
 }
 
 // Event listeners

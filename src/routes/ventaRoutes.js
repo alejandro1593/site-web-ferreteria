@@ -1,29 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const VentaController = require('../controllers/VentaController');
+const { authMiddleware } = require('../middleware/auth');
 
 // GET /api/ventas - Obtener todas las ventas
-router.get('/', VentaController.getAll);
+router.get('/', authMiddleware, VentaController.getAll);
 
 // GET /api/ventas/fecha?fechaInicio=xxx&fechaFin=xxx - Obtener ventas por fecha
-router.get('/fecha', VentaController.getByFecha);
+router.get('/fecha', authMiddleware, VentaController.getByFecha);
 
 // GET /api/ventas/today - Obtener ventas del día
-router.get('/today', VentaController.getTodaySales);
+router.get('/today', authMiddleware, VentaController.getTodaySales);
 
 // GET /api/ventas/summary - Obtener resumen de ventas
-router.get('/summary', VentaController.getSummary);
+router.get('/summary', authMiddleware, VentaController.getSummary);
 
 // GET /api/ventas/cliente/:idCliente - Obtener ventas por cliente
-router.get('/cliente/:idCliente', VentaController.getByCliente);
+router.get('/cliente/:idCliente', authMiddleware, VentaController.getByCliente);
+
+// GET /api/ventas/cliente/:idCliente/historial - Obtener historial de compras del cliente
+router.get('/cliente/:idCliente/historial', authMiddleware, VentaController.getHistorialCliente);
+
+// GET /api/ventas/:id/detalles - Obtener detalles de una venta
+router.get('/:id/detalles', authMiddleware, VentaController.getDetallesVenta);
 
 // GET /api/ventas/:id - Obtener una venta con detalles
-router.get('/:id', VentaController.getById);
+router.get('/:id', authMiddleware, VentaController.getById);
 
 // POST /api/ventas - Crear nueva venta
-router.post('/', VentaController.create);
+router.post('/', authMiddleware, VentaController.create);
 
 // DELETE /api/ventas/:id - Eliminar venta
-router.delete('/:id', VentaController.delete);
+router.delete('/:id', authMiddleware, VentaController.delete);
 
 module.exports = router;

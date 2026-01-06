@@ -5,7 +5,7 @@ const connection = mysql.createConnection({
  host: process.env.DB_HOST || 'localhost',
  user: process.env.DB_USER || 'root',
  password: process.env.DB_PASSWORD || '',
- database: process.env.DB_NAME || 'ferreteria'
+ database: process.env.DB_NAME || 'db_ferreteria'
 });
 
 // Conectar a la base de datos

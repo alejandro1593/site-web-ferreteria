@@ -10,7 +10,7 @@ const Usuario = {
         password VARCHAR(255) NOT NULL,
         nombre VARCHAR(100) NOT NULL,
         email VARCHAR(100) UNIQUE,
-        rol ENUM('admin', 'vendedor') DEFAULT 'vendedor',
+        rol ENUM('admin', 'gerente', 'supervisor', 'vendedor', 'cajero', 'almacen') DEFAULT 'vendedor',
         activo BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -46,13 +46,42 @@ const Usuario = {
   // Crear nuevo usuario
   create: (data, callback) => {
     const sql = 'INSERT INTO usuarios (username, password, nombre, email, rol, activo) VALUES (?, ?, ?, ?, ?, ?)';
-    connection.query(sql, [data.username, data.password, data.nombre, data.email, data.rol || 'vendedor', data.activo !== false], callback);
+    connection.query(sql, [data.username, data.password, data.nombre, data.email, data.rol || 'vendedor', data.activo !== false && data.activo !== 0], callback);
   },
 
   // Actualizar usuario
   update: (id, data, callback) => {
-    const sql = 'UPDATE usuarios SET username = ?, nombre = ?, email = ?, rol = ?, activo = ? WHERE id_usuario = ?';
-    connection.query(sql, [data.username, data.nombre, data.email, data.rol, data.activo, id], callback);
+    const updates = [];
+    const values = [];
+
+    if (data.username !== undefined) {
+      updates.push('username = ?');
+      values.push(data.username);
+    }
+    if (data.nombre !== undefined) {
+      updates.push('nombre = ?');
+      values.push(data.nombre);
+    }
+    if (data.email !== undefined) {
+      updates.push('email = ?');
+      values.push(data.email);
+    }
+    if (data.rol !== undefined) {
+      updates.push('rol = ?');
+      values.push(data.rol);
+    }
+    if (data.activo !== undefined) {
+      updates.push('activo = ?');
+      values.push(data.activo);
+    }
+
+    if (updates.length === 0) {
+      return callback(new Error('No hay campos para actualizar'));
+    }
+
+    values.push(id);
+    const sql = `UPDATE usuarios SET ${updates.join(', ')} WHERE id_usuario = ?`;
+    connection.query(sql, values, callback);
   },
 
   // Actualizar contraseña
