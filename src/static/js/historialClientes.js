@@ -119,6 +119,12 @@ function renderHistorial() {
                 <button class="btn btn-info btn-sm" onclick="verDetallesVenta(${venta.id_venta})" title="Ver detalles">
                     👁️
                 </button>
+                <button class="btn btn-success btn-sm" onclick="exportarFacturaPDF(${venta.id_venta})" title="Exportar PDF">
+                    📄
+                </button>
+                <button class="btn btn-warning btn-sm" onclick="exportarFacturaCSV(${venta.id_venta})" title="Exportar Excel/CSV">
+                    📊
+                </button>
             </td>
         </tr>
     `).join('');
@@ -540,6 +546,362 @@ function exportarHistorialPDF() {
     };
     
     showNotification('PDF generado. Seleccione "Guardar como PDF" en el diálogo de impresión', 'success');
+}
+
+// Exportar factura individual a CSV
+async function exportarFacturaCSV(idVenta) {
+    try {
+        const venta = await fetchAPIAuth(`/ventas/${idVenta}`);
+        const detalles = await fetchAPIAuth(`/ventas/${idVenta}/detalles`);
+
+        const clienteNombre = venta.cliente_nombre || 'Sin cliente';
+        const fechaGeneracion = new Date().toLocaleString('es-MX');
+
+        let csvContent = `Factura #${venta.id_venta}\n\n`;
+        csvContent += `Cliente: ${clienteNombre}\n`;
+        csvContent += `DNI: ${venta.cliente_dni || 'N/A'}\n`;
+        csvContent += `Fecha: ${formatDateTime(venta.fecha)}\n`;
+        csvContent += `Método de Pago: ${venta.metodo_pago}\n`;
+        csvContent += `Estado: ${venta.estado}\n\n`;
+        csvContent += `Subtotal: ${formatCurrency(venta.subtotal)}\n`;
+        csvContent += `IVA: ${formatCurrency(venta.iva)}\n`;
+        if (venta.descuento > 0) {
+            csvContent += `Descuento: ${formatCurrency(venta.descuento)}\n`;
+        }
+        csvContent += `Total: ${formatCurrency(venta.total)}\n\n`;
+        csvContent += `Fecha de generación: ${fechaGeneracion}\n\n`;
+        csvContent += `= DETALLE DE PRODUCTOS =\n\n`;
+        csvContent += `Producto,Código,Cantidad,Precio Unitario,Subtotal\n`;
+
+        detalles.forEach(detalle => {
+            const nombre = (detalle.producto_nombre || '').replace(/,/g, ' ');
+            const codigo = detalle.producto_codigo || 'N/A';
+            const cantidad = detalle.cantidad;
+            const precio = detalle.precio_unitario;
+            const subtotal = detalle.subtotal;
+            csvContent += `"${nombre}","${codigo}",${cantidad},${precio},${subtotal}\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.setAttribute('download', `factura_${venta.id_venta}_${clienteNombre.replace(/\s+/g, '_')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showNotification('Factura exportada en CSV correctamente', 'success');
+
+    } catch (error) {
+        console.error('Error exportando factura CSV:', error);
+        showNotification('Error al exportar la factura', 'error');
+    }
+}
+
+// Exportar factura individual a PDF
+async function exportarFacturaPDF(idVenta) {
+    try {
+        const venta = await fetchAPIAuth(`/ventas/${idVenta}`);
+        const detalles = await fetchAPIAuth(`/ventas/${idVenta}/detalles`);
+
+        const clienteNombre = venta.cliente_nombre || 'Sin cliente';
+        const fechaGeneracion = new Date().toLocaleString('es-MX');
+
+        const printWindow = window.open('', '_blank');
+
+        let html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Factura #${venta.id_venta}</title>
+                <style>
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
+                    
+                    body {
+                        font-family: 'Arial', sans-serif;
+                        font-size: 12px;
+                        padding: 20px;
+                        color: #333;
+                    }
+                    
+                    .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        border-bottom: 3px solid #667eea;
+                        padding-bottom: 20px;
+                    }
+                    
+                    .header h1 {
+                        color: #667eea;
+                        font-size: 28px;
+                        margin-bottom: 10px;
+                    }
+                    
+                    .header h2 {
+                        color: #333;
+                        font-size: 18px;
+                        font-weight: normal;
+                    }
+                    
+                    .info-section {
+                        margin-bottom: 30px;
+                        padding: 15px;
+                        background: #f9f9f9;
+                        border-left: 4px solid #667eea;
+                        border-radius: 5px;
+                    }
+                    
+                    .info-section h3 {
+                        color: #667eea;
+                        margin-bottom: 10px;
+                        font-size: 14px;
+                    }
+                    
+                    .info-grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 10px;
+                    }
+                    
+                    .info-item {
+                        display: flex;
+                        justify-content: space-between;
+                    }
+                    
+                    .info-label {
+                        font-weight: bold;
+                        color: #666;
+                    }
+                    
+                    .info-value {
+                        color: #333;
+                    }
+                    
+                    .totales-section {
+                        margin-bottom: 30px;
+                        padding: 20px;
+                        background: #667eea;
+                        color: white;
+                        border-radius: 8px;
+                    }
+                    
+                    .totales-section h3 {
+                        margin-bottom: 15px;
+                        font-size: 16px;
+                    }
+                    
+                    .totales-grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, 1fr);
+                        gap: 10px;
+                    }
+                    
+                    .total-item {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 5px;
+                    }
+                    
+                    .total-item.grand-total {
+                        font-size: 18px;
+                        font-weight: bold;
+                        margin-top: 10px;
+                        padding-top: 10px;
+                        border-top: 2px solid white;
+                    }
+                    
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 20px;
+                    }
+                    
+                    thead {
+                        background: #667eea;
+                        color: white;
+                    }
+                    
+                    th {
+                        padding: 12px;
+                        text-align: left;
+                        font-weight: bold;
+                        font-size: 11px;
+                        text-transform: uppercase;
+                    }
+                    
+                    td {
+                        padding: 10px;
+                        border-bottom: 1px solid #ddd;
+                    }
+                    
+                    tbody tr:nth-child(even) {
+                        background: #f9f9f9;
+                    }
+                    
+                    tbody tr:hover {
+                        background: #f0f0f0;
+                    }
+                    
+                    .text-right {
+                        text-align: right;
+                    }
+                    
+                    .badge {
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-size: 10px;
+                        font-weight: bold;
+                    }
+                    
+                    .badge-success {
+                        background: #28a745;
+                        color: white;
+                    }
+                    
+                    .badge-warning {
+                        background: #ffc107;
+                        color: #333;
+                    }
+                    
+                    .badge-danger {
+                        background: #dc3545;
+                        color: white;
+                    }
+                    
+                    .footer {
+                        margin-top: 40px;
+                        text-align: center;
+                        color: #666;
+                        font-size: 11px;
+                        border-top: 1px solid #ddd;
+                        padding-top: 20px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🏪 Ferretería - Factura</h1>
+                    <h2>Factura #${venta.id_venta}</h2>
+                </div>
+                
+                <div class="info-section">
+                    <h3>📋 Información de la Factura</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Fecha:</span>
+                            <span class="info-value">${formatDateTimePDF(venta.fecha)}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Estado:</span>
+                            <span class="info-value">
+                                <span class="badge ${venta.estado === 'completada' ? 'badge-success' : venta.estado === 'pendiente' ? 'badge-warning' : 'badge-danger'}">
+                                    ${venta.estado}
+                                </span>
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Método de Pago:</span>
+                            <span class="info-value">${venta.metodo_pago || '-'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Cliente:</span>
+                            <span class="info-value">${clienteNombre}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="totales-section">
+                    <h3>💰 Resumen de la Factura</h3>
+                    <div class="totales-grid">
+                        <div class="total-item">
+                            <span>Subtotal:</span>
+                            <span>${formatCurrencyPDF(venta.subtotal)}</span>
+                        </div>
+                        <div class="total-item">
+                            <span>IVA (16%):</span>
+                            <span>${formatCurrencyPDF(venta.iva)}</span>
+                        </div>
+                        ${venta.descuento > 0 ? `
+                        <div class="total-item">
+                            <span>Descuento:</span>
+                            <span>-${formatCurrencyPDF(venta.descuento)}</span>
+                        </div>` : ''}
+                        <div class="total-item grand-total">
+                            <span>TOTAL:</span>
+                            <span>${formatCurrencyPDF(venta.total)}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>📦 Detalle de Productos</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Código</th>
+                            <th>Cantidad</th>
+                            <th>Precio Unit.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        if (detalles.length === 0) {
+            html += `
+                <tr>
+                    <td colspan="5" class="alert alert-warning">
+                        No hay productos en esta factura
+                    </td>
+                </tr>
+            `;
+        } else {
+            detalles.forEach(detalle => {
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${detalle.producto_nombre}</strong>
+                        </td>
+                        <td><code>${detalle.producto_codigo}</code></td>
+                        <td class="text-center">${detalle.cantidad}</td>
+                        <td class="text-right">${formatCurrencyPDF(detalle.precio_unitario)}</td>
+                        <td class="text-right"><strong>${formatCurrencyPDF(detalle.subtotal)}</strong></td>
+                    </tr>
+                `;
+            });
+        }
+        
+        html += `
+                    </tbody>
+                </table>
+                
+                <div class="footer">
+                    <p>Fecha de generación: ${fechaGeneracion}</p>
+                    <p>Sistema de Gestión de Ferretería © ${new Date().getFullYear()}</p>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        printWindow.document.write(html);
+        printWindow.document.close();
+        
+        printWindow.onload = function() {
+            printWindow.focus();
+            printWindow.print();
+        };
+        
+        showNotification('PDF generado. Seleccione "Guardar como PDF" en el diálogo de impresión', 'success');
+
+    } catch (error) {
+        console.error('Error exportando factura PDF:', error);
+        showNotification('Error al exportar la factura', 'error');
+    }
 }
 
 // Función auxiliar para formatear moneda en el PDF
