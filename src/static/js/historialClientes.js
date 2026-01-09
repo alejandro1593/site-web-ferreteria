@@ -115,13 +115,17 @@ function renderHistorial() {
             <td><strong>${formatCurrency(venta.total)}</strong></td>
             <td>${getPaymentMethodBadge(venta.metodo_pago)}</td>
             <td>${getStatusBadge(venta.estado)}</td>
-            <td>
+            <td class="text-center">
                 <button class="btn btn-info btn-sm" onclick="verDetallesVenta(${venta.id_venta})" title="Ver detalles">
                     👁️
                 </button>
+            </td>
+            <td class="text-center">
                 <button class="btn btn-success btn-sm" onclick="exportarFacturaPDF(${venta.id_venta})" title="Exportar PDF">
                     📄
                 </button>
+            </td>
+            <td class="text-center">
                 <button class="btn btn-warning btn-sm" onclick="exportarFacturaCSV(${venta.id_venta})" title="Exportar Excel/CSV">
                     📊
                 </button>
