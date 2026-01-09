@@ -102,13 +102,20 @@ async function loadTopProductos() {
 
 // Cargar ventas por categoría
 async function loadVentasPorCategoria() {
+    console.log('📊 Cargando ventas por categoría...');
+    
     try {
         const [resumenCategorias, productosPorCategoria] = await Promise.all([
             fetchAPIAuth('/venta-detalles/categoria/resumen'),
             fetchAPIAuth('/venta-detalles/categoria/top')
         ]);
 
+        console.log('✅ Datos recibidos:');
+        console.log('  - Resumen categorías:', resumenCategorias.length, 'categorías');
+        console.log('  - Productos por categoría:', productosPorCategoria.length, 'productos');
+
         if (resumenCategorias.length === 0) {
+            console.warn('⚠️ No hay datos de ventas por categoría');
             document.getElementById('ventas-por-categoria').innerHTML = `
                 <div class="empty-state">
                     No hay datos de ventas por categoría
@@ -120,8 +127,11 @@ async function loadVentasPorCategoria() {
         let html = '';
 
         resumenCategorias.forEach(categoria => {
+            console.log(`  Procesando categoría: ${categoria.categoria_nombre}`);
             const productosCategoria = productosPorCategoria.filter(p => p.id_categoria === categoria.id_categoria);
             const topProductos = productosCategoria.slice(0, 3);
+            console.log(`    - Productos en categoría: ${productosCategoria.length}`);
+            console.log(`    - Top productos: ${topProductos.length}`);
 
             html += `
                 <div class="categoria-card" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; border-left: 4px solid #667eea;">
@@ -175,12 +185,14 @@ async function loadVentasPorCategoria() {
         });
 
         document.getElementById('ventas-por-categoria').innerHTML = html;
+        console.log('✅ Ventas por categoría renderizadas correctamente');
 
     } catch (error) {
-        console.error('Error cargando ventas por categoría:', error);
+        console.error('❌ Error cargando ventas por categoría:', error);
         document.getElementById('ventas-por-categoria').innerHTML = `
             <div class="alert alert-danger">
-                Error al cargar ventas por categoría
+                <strong>Error al cargar ventas por categoría</strong><br>
+                ${error.message || 'Error desconocido'}
             </div>
         `;
     }
