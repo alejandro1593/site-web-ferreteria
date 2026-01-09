@@ -15,6 +15,7 @@ async function loadReportes() {
     
     await loadSummary(fechaInicio, fechaFin);
     await loadTopProductos();
+    await loadVentasPorCategoria();
     await loadVentasHistorial(fechaInicio, fechaFin);
 }
 
@@ -99,96 +100,81 @@ async function loadTopProductos() {
     }
 }
 
-// Cargar ventas por categoría (simulado)
+// Cargar ventas por categoría
 async function loadVentasPorCategoria() {
     try {
-        const ventas = await fetchAPIAuth('/ventas');
+        const [resumenCategorias, productosPorCategoria] = await Promise.all([
+            fetchAPIAuth('/venta-detalles/categoria/resumen'),
+            fetchAPIAuth('/venta-detalles/categoria/top')
+        ]);
 
-        // Simular datos por categoría
-        const ventasPorCategoria = {};
-        ventas.forEach(venta => {
-            // En una implementación real, esto se calcula desde la base de datos
-            // Por ahora, usamos datos de ejemplo
-        });
-
-        document.getElementById('ventas-por-categoria').innerHTML = `
-            <div class="info-box">
-                <h4>ℹ️ Información</h4>
-                <p>Para ver ventas detalladas por categoría, utiliza el reporte completo.</p>
-            </div>
-        `;
-        
-        document.getElementById('summary-grid').innerHTML = summaryHTML;
-        
-    } catch (error) {
-        console.error('Error cargando resumen:', error);
-        document.getElementById('summary-grid').innerHTML = `
-            <div class="alert alert-danger">
-                Error al cargar el resumen de ventas
-            </div>
-        `;
-    }
-}
-
-// Cargar productos más vendidos
-async function loadTopProductos() {
-    try {
-        const topProductos = await fetchAPIAuth('/venta-detalles/top?limit=10');
-
-        if (topProductos.length === 0) {
-            document.getElementById('top-products').innerHTML = `
+        if (resumenCategorias.length === 0) {
+            document.getElementById('ventas-por-categoria').innerHTML = `
                 <div class="empty-state">
-                    No hay datos disponibles
+                    No hay datos de ventas por categoría
                 </div>
             `;
             return;
         }
 
-        const productosHTML = `
-            <ul class="top-products-list">
-                ${topProductos.map((prod, index) => `
-                    <li>
-                        <span class="rank">#${index +1}</span>
-                        <div class="product-info">
-                            <div class="product-name">${prod.nombre}</div>
-                            <small>${prod.codigo}</small>
+        let html = '';
+
+        resumenCategorias.forEach(categoria => {
+            const productosCategoria = productosPorCategoria.filter(p => p.id_categoria === categoria.id_categoria);
+            const topProductos = productosCategoria.slice(0, 3);
+
+            html += `
+                <div class="categoria-card" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; border-left: 4px solid #667eea;">
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="margin: 0; color: #667eea; font-size: 16px;">
+                            ${categoria.categoria_nombre}
+                        </h4>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; font-size: 12px;">
+                            <div>
+                                <strong>Ventas:</strong> ${categoria.total_ventas}
+                            </div>
+                            <div>
+                                <strong>Productos:</strong> ${categoria.total_productos}
+                            </div>
+                            <div>
+                                <strong>Total:</strong> ${formatCurrency(categoria.total_recaudado)}
+                            </div>
                         </div>
-                        <div class="sales-count">${prod.total_vendido} vendidos</div>
-                    </li>
-                `).join('')}
-            </ul>
-        `;
+                    </div>
 
-        document.getElementById('top-products').innerHTML = productosHTML;
-
-    } catch (error) {
-        console.error('Error cargando top productos:', error);
-        document.getElementById('top-products').innerHTML = `
-            <div class="alert alert-danger">
-                Error al cargar productos más vendidos
-            </div>
-        `;
-    }
-}
-
-// Cargar ventas por categoría (simulado)
-async function loadVentasPorCategoria() {
-    try {
-        const ventas = await fetchAPIAuth('/ventas');
-
-        // Simular datos por categoría
-        const ventasPorCategoria = {};
-        ventas.forEach(venta => {
-            // En una implementación real, esto se calcula desde la base de datos
-            // Por ahora, usamos datos de ejemplo
+                    ${topProductos.length > 0 ? `
+                        <div>
+                            <h5 style="margin: 0 0 10px 0; font-size: 13px; color: #333;">
+                                🏆 Top Productos
+                            </h5>
+                            <div style="font-size: 12px;">
+                                ${topProductos.map((producto, index) => `
+                                    <div style="padding: 8px; margin-bottom: 5px; background: white; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
+                                        <div style="flex: 1;">
+                                            <span style="font-weight: bold; color: #667eea;">#${index + 1}</span>
+                                            <span style="margin-left: 8px; font-weight: 500;">${producto.producto_nombre}</span>
+                                            <div style="color: #666; font-size: 11px; margin-top: 3px;">
+                                                ${producto.producto_codigo} • ${formatCurrency(producto.precio_venta)} c/u
+                                            </div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="color: #4CAF50; font-weight: bold;">
+                                                ${producto.total_vendido} vendidos
+                                            </div>
+                                            <div style="color: #666; font-size: 11px;">
+                                                ${formatCurrency(producto.total_recaudado)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
         });
 
-        document.getElementById('ventas-por-categoria').innerHTML = `
-            <div class="info-box">
-                <h4>ℹ️ Información</h4>
-                <p>Para ver ventas detalladas por categoría, utiliza el reporte completo.</p>
-            </div>
-        `;
+        document.getElementById('ventas-por-categoria').innerHTML = html;
 
     } catch (error) {
         console.error('Error cargando ventas por categoría:', error);

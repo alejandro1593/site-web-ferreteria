@@ -32,6 +32,26 @@ const VentaDetalleController = {
       }
       res.json(results);
     });
+  },
+
+  // Obtener productos más vendidos por categoría
+  getTopProductosPorCategoria: (req, res) => {
+    VentaDetalle.getTopProductosPorCategoria((err, results) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error al obtener productos por categoría' });
+      }
+      res.json(results);
+    });
+  },
+
+  // Obtener ventas por categoría
+  getVentasPorCategoria: (req, res) => {
+    VentaDetalle.getVentasPorCategoria((err, results) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error al obtener ventas por categoría' });
+      }
+      res.json(results);
+    });
   }
 };
 
