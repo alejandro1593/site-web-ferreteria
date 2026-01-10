@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotizaciones - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/devoluciones.html"><i>↩️</i> Devoluciones</a>
+            <a href="/caja.html"><i>💵</i> Caja</a>
+            <a href="/cotizaciones.html" class="active"><i>📝</i> Cotizaciones</a>
+            <a href="/historial-cajas.html"><i>📋</i> Historial Cajas</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
+        </div>
+        
+        <div id="user-info"></div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>📝 Cotizaciones</h1>
+            <p>Gestión de cotizaciones de ventas</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📊 Resumen de Cotizaciones</h3>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid" id="cotizaciones-stats">
+                    <div class="loading-spinner">Cargando estadísticas...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📝 Nueva Cotización</h3>
+            </div>
+            <div class="card-body">
+                <form id="cotizacion-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cliente-select">Cliente:</label>
+                            <select id="cliente-select">
+                                <option value="">Seleccionar cliente...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="fecha-validez">Fecha de Validez:</label>
+                            <input type="date" id="fecha-validez">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Productos:</label>
+                        <div id="productos-cotizacion">
+                            <div class="empty-state" style="padding: 20px;">
+                                No hay productos agregados
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalAgregarProducto()">
+                            ➕ Agregar Producto
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="observaciones">Observaciones:</label>
+                        <textarea id="observaciones" rows="3" placeholder="Notas adicionales..."></textarea>
+                    </div>
+                    
+                    <div class="resumen-cotizacion">
+                        <h4>Resumen</h4>
+                        <div class="resumen-grid">
+                            <div class="resumen-item">
+                                <strong>Subtotal:</strong>
+                                <span id="subtotal">$0.00</span>
+                            </div>
+                            <div class="resumen-item">
+                                <strong>IVA (16%):</strong>
+                                <span id="iva">$0.00</span>
+                            </div>
+                            <div class="resumen-item">
+                                <strong>Descuento:</strong>
+                                <span id="descuento">$0.00</span>
+                            </div>
+                            <div class="resumen-item total">
+                                <strong>TOTAL:</strong>
+                                <span id="total">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-success" onclick="crearCotizacion()">
+                            📝 Crear Cotización
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📋 Cotizaciones</h3>
+                <div class="card-actions">
+                    <select id="filtro-cliente" onchange="loadCotizaciones()">
+                        <option value="">Todos los clientes</option>
+                    </select>
+                    <select id="filtro-estado" onchange="loadCotizaciones()">
+                        <option value="">Todos los estados</option>
+                        <option value="pendiente">Pendientes</option>
+                        <option value="aprobada">Aprobadas</option>
+                        <option value="rechazada">Rechazadas</option>
+                        <option value="convertida">Convertidas</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="cotizaciones-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Cliente</th>
+                                <th>Fecha Emisión</th>
+                                <th>Fecha Validez</th>
+                                <th>Estado</th>
+                                <th>Subtotal</th>
+                                <th>Total</th>
+                                <th style="width: 200px;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cotizaciones-tbody">
+                            <tr>
+                                <td colspan="8" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Modal Agregar Producto -->
+    <div id="modal-agregar-producto" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Agregar Producto</h3>
+                <button class="modal-close" onclick="closeModal('modal-agregar-producto')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="producto-cotizacion">Producto:</label>
+                    <select id="producto-cotizacion">
+                        <option value="">Seleccionar producto...</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="cantidad-cotizacion">Cantidad:</label>
+                        <input type="number" id="cantidad-cotizacion" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="descuento-cotizacion">Descuento:</label>
+                        <input type="number" id="descuento-cotizacion" step="0.01" min="0" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Precio:</label>
+                    <strong id="precio-producto">$0.00</strong>
+                </div>
+                <div class="form-group">
+                    <label>Subtotal:</label>
+                    <strong id="subtotal-producto">$0.00</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" onclick="closeModal('modal-agregar-producto')">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="agregarProducto()">Agregar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Detalles Cotización -->
+    <div id="modal-detalles-cotizacion" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Detalles de Cotización</h3>
+                <button class="modal-close" onclick="closeModal('modal-detalles-cotizacion')">×</button>
+            </div>
+            <div class="modal-body" id="cotizacion-detalles-content">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Confirmar Pago -->
+    <div id="modal-confirmar-pago" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💵 Confirmar Pago</h3>
+                <button class="modal-close" onclick="closeModal('modal-confirmar-pago')">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Seleccione el método de pago:</p>
+                <div class="form-group">
+                    <label for="metodo-pago">Método de Pago:</label>
+                    <select id="metodo-pago">
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta">Tarjeta de Crédito/Débito</option>
+                        <option value="transferencia">Transferencia Bancaria</option>
+                    </select>
+                </div>
+                <input type="hidden" id="cotizacion-id-pago">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" onclick="closeModal('modal-confirmar-pago')">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="confirmarPago()">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/jspdf.umd.min.js"></script>
+    <script src="/static/js/cotizaciones.js"></script>
+</body>
+</html>

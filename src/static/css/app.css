@@ -220,6 +220,16 @@ body {
     font-size: 0.8em;
 }
 
+.table-actions {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.table-actions .btn-sm {
+    margin: 0;
+}
+
 .card-body {
     padding: 20px;
 }
