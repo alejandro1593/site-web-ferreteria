@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Ventas - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
+        </div>
+        
+        <div id="user-info"></div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>📋 Historial de Ventas</h1>
+            <p>Todas las ventas realizadas en el sistema</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📊 Resumen de Ventas</h3>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid" id="ventas-stats">
+                    <div class="loading-spinner">Cargando estadísticas...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📋 Ventas</h3>
+                <div class="card-actions">
+                    <button class="btn btn-success btn-sm" onclick="exportarVentasCSV()">
+                        📊 Exportar CSV
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="ventas-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Estado</th>
+                                <th>Metodo Pago</th>
+                                <th>Items</th>
+                                <th>Subtotal</th>
+                                <th>IVA</th>
+                                <th>Descuento</th>
+                                <th>Total</th>
+                                <th class="text-center">Ver Detalles</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ventas-tbody">
+                            <tr>
+                                <td colspan="11" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div id="venta-detalles-modal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3>Detalles de Venta</h3>
+                    <button class="modal-close" onclick="closeModal('venta-detalles-modal')">×</button>
+                </div>
+                <div class="modal-body" id="venta-detalles-content">
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/historialVentas.js"></script>
+</body>
+</html>

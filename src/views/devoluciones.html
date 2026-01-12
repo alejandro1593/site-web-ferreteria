@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devoluciones - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/devoluciones.html" class="active"><i>↩️</i> Devoluciones</a>
+            <a href="/caja.html"><i>💵</i> Caja</a>
+            <a href="/historial-cajas.html"><i>📋</i> Histórico Cajas</a>
+            <a href="/cotizaciones.html"><i>📝</i> Cotizaciones</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
+        </div>
+        
+        <div id="user-info"></div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>↩️ Devoluciones</h1>
+            <p>Gestión de devoluciones de productos</p>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📊 Resumen de Devoluciones</h3>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid" id="devoluciones-stats">
+                    <div class="loading-spinner">Cargando estadísticas...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📋 Nueva Devolución</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="venta-select">Venta:</label>
+                        <select id="venta-select" onchange="cargarDetallesVenta()">
+                            <option value="">Seleccionar venta...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="producto-select">Producto:</label>
+                        <select id="producto-select">
+                            <option value="">Seleccionar producto...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="cantidad">Cantidad:</label>
+                        <input type="number" id="cantidad" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="metodo-reembolso">Método Reembolso:</label>
+                        <select id="metodo-reembolso">
+                            <option value="efectivo">Efectivo</option>
+                            <option value="tarjeta">Tarjeta</option>
+                            <option value="transferencia">Transferencia</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="motivo">Motivo:</label>
+                    <textarea id="motivo" rows="3" placeholder="Motivo de la devolución..."></textarea>
+                </div>
+                
+                <div class="alert alert-info" id="reembolso-info" style="display: none;">
+                    <strong>Monto a reembolsar:</strong> <span id="monto-reembolso">$0.00</span>
+                </div>
+                
+                <button class="btn btn-primary" onclick="procesarDevolucion()">
+                    ↩️ Procesar Devolución
+                </button>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📋 Historial de Devoluciones</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="devoluciones-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Venta</th>
+                                <th>Cliente</th>
+                                <th>Producto</th>
+                                <th>Cantidad</th>
+                                <th>Monto Reembolso</th>
+                                <th>Método</th>
+                                <th>Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="devoluciones-tbody">
+                            <tr>
+                                <td colspan="9" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/devoluciones.js"></script>
+</body>
+</html>

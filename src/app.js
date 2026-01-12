@@ -13,6 +13,10 @@ require('./models/Usuario');
 require('./models/Producto');
 require('./models/Venta');
 require('./models/VentaDetalle');
+require('./models/Devolucion');
+require('./models/Caja');
+require('./models/Cotizacion');
+require('./models/CotizacionDetalle');
 
 // Importar controlador
 const ProductoController = require('./controllers/ProductoController');

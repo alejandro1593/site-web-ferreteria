@@ -31,9 +31,9 @@ const Usuario = {
     connection.query(sql, callback);
   },
 
-  // Obtener usuario por ID (sin password)
+  // Obtener usuario por ID (con password para validaciones de caja)
   findById: (id, callback) => {
-    const sql = 'SELECT id_usuario, username, nombre, email, rol, activo, created_at, updated_at FROM usuarios WHERE id_usuario = ?';
+    const sql = 'SELECT * FROM usuarios WHERE id_usuario = ?';
     connection.query(sql, [id], callback);
   },
 

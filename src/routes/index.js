@@ -9,6 +9,9 @@ const usuarioRoutes = require('./usuarioRoutes');
 const productoRoutes = require('./productoRoutes');
 const ventaRoutes = require('./ventaRoutes');
 const ventaDetalleRoutes = require('./ventaDetalleRoutes');
+const devolucionRoutes = require('./devolucionRoutes');
+const cajaRoutes = require('./cajaRoutes');
+const cotizacionRoutes = require('./cotizacionRoutes');
 
 // Montar todas las rutas
 router.use('/categorias', categoriaRoutes);
@@ -18,6 +21,9 @@ router.use('/usuarios', usuarioRoutes);
 router.use('/productos', productoRoutes);
 router.use('/ventas', ventaRoutes);
 router.use('/venta-detalles', ventaDetalleRoutes);
+router.use('/devoluciones', devolucionRoutes);
+router.use('/caja', cajaRoutes);
+router.use('/cotizaciones', cotizacionRoutes);
 
 // Ruta raíz para API
 router.get('/', (req, res) => {

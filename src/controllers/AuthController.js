@@ -50,21 +50,21 @@ const AuthController = {
       // Generar token JWT
       const token = jwt.sign(
         {
-          id: usuario.id_usuario,
+          id_usuario: usuario.id_usuario,
           username: usuario.username,
           nombre: usuario.nombre,
           email: usuario.email,
           rol: usuario.rol
         },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
       console.log('Token generado exitosamente');
 
       // Preparar datos de respuesta (sin password)
       const usuarioResponse = {
-        id: usuario.id_usuario,
+        id_usuario: usuario.id_usuario,
         username: usuario.username,
         nombre: usuario.nombre,
         email: usuario.email,
@@ -145,7 +145,7 @@ const AuthController = {
   // Cambiar contraseña
   changePassword: (req, res) => {
     const { oldPassword, newPassword } = req.body || {};
-    const userId = req.user.id; // ID del usuario autenticado
+    const userId = req.user.id_usuario; // ID del usuario autenticado
 
     if (!oldPassword || !newPassword) {
       return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });

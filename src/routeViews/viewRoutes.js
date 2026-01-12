@@ -84,6 +84,46 @@ router.get('/historial-clientes.html', (req, res) => {
     res.sendFile(path.join(viewsPath, 'historial-clientes.html'));
 });
 
+router.get('/historial-ventas', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'historial-ventas.html'));
+});
+
+router.get('/historial-ventas.html', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'historial-ventas.html'));
+});
+
+router.get('/devoluciones', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'devoluciones.html'));
+});
+
+router.get('/devoluciones.html', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'devoluciones.html'));
+});
+
+router.get('/caja', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'caja.html'));
+});
+
+router.get('/caja.html', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'caja.html'));
+});
+
+router.get('/historial-cajas', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'historial-cajas.html'));
+});
+
+router.get('/historial-cajas.html', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'historial-cajas.html'));
+});
+
+router.get('/cotizaciones', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'cotizaciones.html'));
+});
+
+router.get('/cotizaciones.html', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'cotizaciones.html'));
+});
+
 router.get('/reportes', (req, res) => {
     res.sendFile(path.join(viewsPath, 'reportes.html'));
 });

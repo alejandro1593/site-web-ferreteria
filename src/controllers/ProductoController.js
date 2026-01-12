@@ -188,11 +188,12 @@ const ProductoController = {
       const { id } = req.params;
       const { cantidad } = req.body || {};
 
-     if (cantidad === undefined || cantidad < 0) {
-       return res.status(400).json({ error: 'Cantidad inválida' });
-     }
+      const cantidadNum = Number(cantidad);
+      if (cantidad === undefined || isNaN(cantidadNum) || cantidadNum < 0) {
+        return res.status(400).json({ error: 'Cantidad inválida' });
+      }
 
-     Producto.updateStock(id, cantidad, (err, result) => {
+      Producto.updateStock(id, cantidadNum, (err, result) => {
        if (err) {
          return res.status(500).json({ error: 'Error al actualizar stock' });
        }
@@ -265,7 +266,7 @@ const ProductoController = {
 
       const fileName = req.file.filename;
 
-       const id = (req.body || {}).id;
+      const id = (req.body || {}).id;
 
       Producto.findById(id, (err, results) => {
         if (err) {

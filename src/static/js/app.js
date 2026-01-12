@@ -92,6 +92,9 @@ async function fetchAPIAuth(endpoint, options = {}) {
 
         // Si el token expiró o es inválido (401)
         if (response.status === 401) {
+            const errorText = await response.text();
+            console.log('❌ Error 401 - Respuesta del servidor:', errorText);
+            
             if (typeof logout === 'function') {
                 logout();
             } else {

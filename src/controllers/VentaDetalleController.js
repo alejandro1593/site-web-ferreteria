@@ -26,7 +26,9 @@ const VentaDetalleController = {
   // Obtener productos más vendidos
   getTopProductos: (req, res) => {
     const { limit = 10 } = req.query;
-    VentaDetalle.getTopProductos(parseInt(limit), (err, results) => {
+    const limitNum = parseInt(limit);
+    const validLimit = isNaN(limitNum) ? 10 : limitNum;
+    VentaDetalle.getTopProductos(validLimit, (err, results) => {
       if (err) {
         return res.status(500).json({ error: 'Error al obtener productos más vendidos' });
       }

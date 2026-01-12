@@ -18,4 +18,18 @@ router.get('/producto/:idProducto', authMiddleware, VentaDetalleController.getBy
 // GET /api/venta-detalles/:idVenta - Obtener detalles de una venta
 router.get('/:idVenta', authMiddleware, VentaDetalleController.getByIdVenta);
 
+// GET /api/venta-detalles - Listar todas las rutas de venta-detalles
+router.get('/', (req, res) => {
+    res.json({
+        message: 'Rutas de VentaDetalle disponibles',
+        endpoints: [
+            'GET /api/venta-detalles/top?limit=10 - Productos más vendidos',
+            'GET /api/venta-detalles/categoria/top - Productos por categoría',
+            'GET /api/venta-detalles/categoria/resumen - Resumen por categoría',
+            'GET /api/venta-detalles/producto/:idProducto - Historial de producto',
+            'GET /api/venta-detalles/:idVenta - Detalles de venta'
+        ]
+    });
+});
+
 module.exports = router;

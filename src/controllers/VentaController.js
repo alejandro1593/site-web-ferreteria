@@ -164,20 +164,20 @@ const VentaController = {
         const iva = subtotal * 0.16; // 16% IVA
         const total = subtotal + iva - descuento;
 
-        Venta.create({
-          id_cliente,
-          subtotal,
-          iva,
-          descuento,
-          total,
-          metodo_pago,
-          estado: 'completada'
-        }, (err, ventaResult) => {
-          if (err) {
-            return res.status(500).json({ error: 'Error al crear venta' });
-          }
+          Venta.create({
+            id_cliente,
+            subtotal,
+            iva,
+            descuento,
+            total,
+            metodo_pago,
+            estado: 'completada'
+          }, (err, result) => {
+            if (err) {
+              return res.status(500).json({ error: 'Error al crear venta' });
+            }
 
-          const idVenta = ventaResult.insertId;
+            const idVenta = result.insertId;
 
           // Crear detalles y actualizar stock
           const detallePromises = detalles.map(detalle => {
@@ -225,7 +225,7 @@ const VentaController = {
         });
       })
       .catch(err => {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ error: err.message || 'Error en el procesamiento de la venta' });
       });
   },
 

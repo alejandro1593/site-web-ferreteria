@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Caja - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/devoluciones.html"><i>↩️</i> Devoluciones</a>
+            <a href="/caja.html" class="active"><i>💵</i> Caja</a>
+            <a href="/historial-cajas.html"><i>📋</i> Historial Cajas</a>
+            <a href="/cotizaciones.html"><i>📝</i> Cotizaciones</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
+        </div>
+        
+        <div id="user-info"></div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>💵 Gestión de Caja</h1>
+            <p>Control de aperturas, cierres y arqueo de caja</p>
+        </div>
+        
+        <div id="estado-caja-section">
+            <div id="caja-cerrada" class="content-card">
+                <div class="card-body" style="text-align: center; padding: 40px;">
+                    <div style="font-size: 3em; margin-bottom: 20px;">🔒</div>
+                    <h3>Caja Cerrada</h3>
+                    <p>No hay caja abierta. Abra la caja para comenzar a vender.</p>
+                    <div class="form-group" style="max-width: 300px; margin: 20px auto;">
+                        <label for="cajero-select">Cajero Responsable:</label>
+                        <select id="cajero-select">
+                            <option value="">Seleccionar cajero...</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="max-width: 300px; margin: 20px auto;">
+                        <label for="password-cajero">Password del Cajero:</label>
+                        <input type="password" id="password-cajero" placeholder="Ingrese password">
+                    </div>
+                    <div class="form-group" style="max-width: 300px; margin: 20px auto;">
+                        <label for="monto-apertura">Monto de apertura:</label>
+                        <input type="number" id="monto-apertura" step="0.01" min="0" value="0" placeholder="0.00">
+                    </div>
+                    <div class="form-group" style="max-width: 300px; margin: 20px auto;">
+                        <label for="observaciones-apertura">Observaciones:</label>
+                        <textarea id="observaciones-apertura" rows="2" placeholder="Opcional..."></textarea>
+                    </div>
+                    <button class="btn btn-success" onclick="abrirCaja()">
+                        💵 Abrir Caja
+                    </button>
+                </div>
+            </div>
+            
+            <div id="caja-abierta" class="content-card" style="display: none;">
+                <div class="card-header">
+                    <h3>💵 Caja Abierta</h3>
+                    <button class="btn btn-danger" onclick="mostrarModalCierre()">
+                        🔒 Cerrar Caja
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="stats-grid" id="caja-stats">
+                        <div class="loading-spinner">Cargando estadísticas...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="resumen-caja-section" class="content-card" style="display: none;">
+            <div class="card-header">
+                <h3>📊 Resumen de Caja</h3>
+            </div>
+            <div class="card-body">
+                <div id="resumen-detalles"></div>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>📋 Historial de Cajas</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="cajas-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuario</th>
+                                <th>Apertura</th>
+                                <th>Cierre</th>
+                                <th>Monto Apertura</th>
+                                <th>Monto Cierre</th>
+                                <th>Diferencia</th>
+                                <th>Estado</th>
+                                <th class="text-center">Ver Detalles</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cajas-tbody">
+                            <tr>
+                                <td colspan="9" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div id="modal-cierre-caja" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🔒 Cerrar Caja</h3>
+                    <button class="modal-close" onclick="closeModal('modal-cierre-caja')">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cajero-cierre-select">Cajero:</label>
+                        <select id="cajero-cierre-select">
+                            <option value="">Seleccionar cajero...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="password-cierre">Password del Cajero:</label>
+                        <input type="password" id="password-cierre" placeholder="Ingrese password">
+                    </div>
+                    <div class="form-group">
+                        <label for="monto-cierre">Monto en caja:</label>
+                        <input type="number" id="monto-cierre" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="observaciones-cierre">Observaciones:</label>
+                        <textarea id="observaciones-cierre" rows="3" placeholder="Opcional..."></textarea>
+                    </div>
+                    <div id="previo-cierre" style="margin: 20px 0; padding: 15px; background: #f0f0f0; border-radius: 5px; display: none;">
+                        <p><strong>Monto esperado:</strong> <span id="monto-esperado">$0.00</span></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" onclick="closeModal('modal-cierre-caja')">Cancelar</button>
+                    <button class="btn btn-success" onclick="cerrarCaja()">
+                        🔒 Cerrar Caja
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/caja.js"></script>
+</body>
+</html>

@@ -111,7 +111,7 @@ const VentaDetalle = {
   },
 
   // Obtener productos más vendidos por categoría
-  getTopProductosPorCategoria: (limit, callback) => {
+  getTopProductosPorCategoria: (callback) => {
     const sql = `
       SELECT 
         c.id_categoria,
@@ -133,7 +133,7 @@ const VentaDetalle = {
       GROUP BY c.id_categoria, p.id_producto
       ORDER BY c.nombre ASC, total_vendido DESC
     `;
-    connection.query(sql, [limit], callback);
+    connection.query(sql, callback);
   },
 
   // Obtener resumen de ventas por categoría

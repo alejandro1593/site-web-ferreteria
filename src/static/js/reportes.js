@@ -16,7 +16,6 @@ async function loadReportes() {
     await loadSummary(fechaInicio, fechaFin);
     await loadTopProductos();
     await loadVentasPorCategoria();
-    await loadVentasHistorial(fechaInicio, fechaFin);
 }
 
 // Cargar resumen de ventas
@@ -77,7 +76,7 @@ async function loadTopProductos() {
             <ul class="top-products-list">
                 ${topProductos.map((prod, index) => `
                     <li>
-                        <span class="rank">#${index +1}</span>
+                        <span class="rank">#${index + 1}</span>
                         <div class="product-info">
                             <div class="product-name">${prod.nombre}</div>
                             <small>${prod.codigo}</small>
@@ -198,50 +197,6 @@ async function loadVentasPorCategoria() {
     }
 }
 
-// Cargar histórico de ventas
-async function loadVentasHistorial(fechaInicio, fechaFin) {
-    try {
-        const ventas = await fetchAPIAuth(`/ventas/fecha?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
-        
-        if (ventas.length === 0) {
-            document.getElementById('ventas-historial-tbody').innerHTML = `
-                <tr>
-                    <td colspan="7" class="empty-state">
-                        No hay ventas en el período seleccionado
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-        
-        const tbody = document.getElementById('ventas-historial-tbody');
-        tbody.innerHTML = ventas.map(venta => `
-            <tr>
-                <td>#${venta.id_venta}</td>
-                <td>${formatDate(venta.fecha)}</td>
-                <td>${venta.cliente_nombre || 'Sin cliente'}</td>
-                <td>
-                    <span class="status-badge status-${venta.estado === 'completada' ? 'active' : 'pending'}">
-                        ${venta.estado}
-                    </span>
-                </td>
-                <td>${venta.metodo_pago}</td>
-                <td><strong>${formatCurrency(venta.total)}</strong></td>
-            </tr>
-        `).join('');
-        
-    } catch (error) {
-        console.error('Error cargando histórico de ventas:', error);
-        document.getElementById('ventas-historial-tbody').innerHTML = `
-            <tr>
-                <td colspan="7" class="alert alert-danger">
-                    Error al cargar el histórico de ventas
-                </td>
-            </tr>
-        `;
-    }
-}
-
 // Generar reporte diario
 async function generarReporteDiario() {
     const hoy = new Date();
@@ -253,39 +208,6 @@ async function generarReporteDiario() {
     await loadReportes();
     
     showNotification('Reporte diario generado', 'success');
-}
-
-// Exportar ventas (descargar CSV)
-async function exportarVentas() {
-    const fechaInicio = document.getElementById('fecha-inicio').value;
-    const fechaFin = document.getElementById('fecha-fin').value;
-
-    try {
-        const ventas = await fetchAPIAuth(`/ventas/fecha?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
-
-        // Crear CSV
-        let csv = 'ID,Fecha,Cliente,Estado,MetodoPago,Total\n';
-        ventas.forEach(venta => {
-            csv += `${venta.id_venta},${venta.fecha},${venta.cliente_nombre || 'Sin cliente'},${venta.estado},${venta.metodo_pago},${venta.total}\n`;
-        });
-
-        // Descargar archivo
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ventas_${fechaInicio}_${fechaFin}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        showNotification('Ventas exportadas exitosamente', 'success');
-
-    } catch (error) {
-        console.error('Error exportando ventas:', error);
-        showNotification('Error al exportar las ventas', 'error');
-    }
 }
 
 // Event listeners

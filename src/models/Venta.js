@@ -27,14 +27,17 @@ const Venta = {
     });
   },
 
-  // Obtener todas las ventas con cliente
+  // Obtener todas las ventas con cliente y total de items
   findAll: (callback) => {
     const sql = `
       SELECT v.*, 
         CONCAT(c.nombre, ' ', c.apellido) as cliente_nombre, 
-        c.dni as cliente_dni 
+        c.dni as cliente_dni,
+        COUNT(vd.id_detalle) as total_items
       FROM ventas v 
-      LEFT JOIN clientes c ON v.id_cliente = c.id_cliente 
+      LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+      LEFT JOIN venta_detalle vd ON v.id_venta = vd.id_venta
+      GROUP BY v.id_venta
       ORDER BY v.fecha DESC
     `;
     connection.query(sql, callback);
@@ -61,7 +64,7 @@ const Venta = {
         c.dni as cliente_dni 
       FROM ventas v 
       LEFT JOIN clientes c ON v.id_cliente = c.id_cliente 
-      WHERE v.fecha BETWEEN ? AND ? 
+      WHERE DATE(v.fecha) BETWEEN ? AND ? 
       ORDER BY v.fecha DESC
     `;
     connection.query(sql, [fechaInicio, fechaFin], callback);

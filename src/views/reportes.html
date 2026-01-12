@@ -191,6 +191,10 @@
             <a href="/productos.html"><i>📦</i> Productos</a>
             <a href="/ventas.html"><i>💰</i> Ventas</a>
             <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/devoluciones.html"><i>↩️</i> Devoluciones</a>
+            <a href="/caja.html"><i>💵</i> Caja</a>
+            <a href="/historial-cajas.html"><i>📋</i> Historial Cajas</a>
+            <a href="/cotizaciones.html"><i>📝</i> Cotizaciones</a>
             <a href="/reportes.html" class="active"><i>📈</i> Reportes</a>
             <a href="/api.html"><i>🔧</i> API Docs</a>
         </div>
@@ -239,35 +243,6 @@
             </div>
         </div>
         
-        <div class="content-card">
-            <div class="card-header">
-                <h3>📋 Historial de Ventas</h3>
-                <button class="btn btn-success" onclick="exportarVentas()">
-                    📥 Exportar
-                </button>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table id="ventas-historial-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Fecha</th>
-                                <th>Cliente</th>
-                                <th>Estado</th>
-                                <th>Metodo Pago</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ventas-historial-tbody">
-                            <tr>
-                                <td colspan="7" class="loading-spinner">Cargando...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
     </main>
     
     <script src="/static/js/app.js"></script>
