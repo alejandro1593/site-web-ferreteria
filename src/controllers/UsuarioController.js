@@ -34,6 +34,8 @@ const UsuarioController = {
       return res.status(400).json({ error: 'Username, password y nombre son requeridos' });
     }
 
+    const ROLES_VALIDOS = ['admin', 'gerente', 'supervisor', 'vendedor', 'cajero', 'almacen'];
+
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
       Usuario.create({ 
@@ -41,7 +43,7 @@ const UsuarioController = {
         password: hashedPassword, 
         nombre, 
         email, 
-        rol: rol || 'vendedor', 
+        rol: ROLES_VALIDOS.includes(rol) ? rol : 'vendedor', 
         activo: activo === true || activo === 'true' || activo === 1
       }, (err, result) => {
         if (err) {
@@ -63,50 +65,40 @@ const UsuarioController = {
       const { id } = req.params;
       const { username, nombre, email, rol, activo } = req.body || {};
 
-      console.log('🔄 Actualizando usuario ID:', id);
-      console.log('📝 Datos recibidos:', { username, nombre, email, rol, activo });
-      console.log('📝 Tipo de activo:', typeof activo);
+      const ROLES_VALIDOS = ['admin', 'gerente', 'supervisor', 'vendedor', 'cajero', 'almacen'];
+      if (rol !== undefined && !ROLES_VALIDOS.includes(rol)) {
+        return res.status(400).json({ error: 'Rol no válido' });
+      }
 
       if (!username || !nombre) {
-        console.log('❌ Error: Username y nombre son requeridos');
         return res.status(400).json({ error: 'Username y nombre son requeridos' });
       }
 
       Usuario.findById(id, (err, results) => {
         if (err) {
-          console.log('❌ Error al verificar usuario:', err);
-          return res.status(500).json({ error: 'Error al verificar usuario: ' + err.message });
+          return res.status(500).json({ error: 'Error al verificar usuario' });
         }
         if (results.length === 0) {
-          console.log('❌ Usuario no encontrado');
           return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        console.log('✅ Usuario encontrado, procediendo a actualizar');
         const updateData = { username, nombre };
         if (email !== undefined) updateData.email = email;
         if (rol !== undefined) updateData.rol = rol;
         if (activo !== undefined) updateData.activo = activo === true || activo === 'true' || activo === 1;
 
-        console.log('📝 Datos a actualizar:', updateData);
-
         Usuario.update(id, updateData, (err, result) => {
           if (err) {
-            console.log('❌ Error al actualizar usuario:', err);
-            console.log('❌ Error code:', err.code);
-            console.log('❌ Error sqlMessage:', err.sqlMessage);
             if (err.code === 'ER_DUP_ENTRY') {
               return res.status(400).json({ error: 'Ya existe un usuario con ese username o email' });
             }
-            return res.status(500).json({ error: 'Error al actualizar usuario: ' + err.message });
+            return res.status(500).json({ error: 'Error al actualizar usuario' });
           }
-          console.log('✅ Usuario actualizado exitosamente');
           res.json({ message: 'Usuario actualizado exitosamente' });
         });
       });
     } catch (error) {
-      console.error('❌ Error inesperado en update:', error);
-      return res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+      return res.status(500).json({ error: 'Error interno del servidor' });
     }
   },
 

@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const VentaController = require('../controllers/VentaController');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+
+const adminOGerente = roleMiddleware(['admin', 'gerente']);
 
 // GET /api/ventas - Obtener todas las ventas
 router.get('/', authMiddleware, VentaController.getAll);
@@ -30,7 +32,7 @@ router.get('/:id', authMiddleware, VentaController.getById);
 // POST /api/ventas - Crear nueva venta
 router.post('/', authMiddleware, VentaController.create);
 
-// DELETE /api/ventas/:id - Eliminar venta
-router.delete('/:id', authMiddleware, VentaController.delete);
+// DELETE /api/ventas/:id - Eliminar venta (solo admin/gerente)
+router.delete('/:id', authMiddleware, adminOGerente, VentaController.delete);
 
 module.exports = router;

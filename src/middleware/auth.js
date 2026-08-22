@@ -2,31 +2,22 @@ const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
   try {
-    console.log('=== AUTH MIDDLEWARE ===');
     // Obtener el token del header Authorization
     const authHeader = req.headers.authorization;
 
-    console.log('AuthHeader:', authHeader);
-
     if (!authHeader) {
-      console.log('Error: No hay authHeader');
       return res.status(401).json({ error: 'No se proporcionó token de autenticación' });
     }
 
     // El formato debe ser: "Bearer <token>"
     const token = authHeader.split(' ')[1];
 
-    console.log('Token:', token ? token.substring(0, 30) + '...' : 'no token');
-
     if (!token) {
-      console.log('Error: Token vacío');
       return res.status(401).json({ error: 'Formato de token inválido' });
     }
 
     // Verificar y decodificar el token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    console.log('Token decodificado:', decoded);
 
     // Agregar la información del usuario decodificada al objeto request
     req.user = decoded;
@@ -40,7 +31,6 @@ const authMiddleware = (req, res, next) => {
     next();
 
   } catch (error) {
-    console.log('Error en authMiddleware:', error.name, error.message);
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ error: 'Token inválido' });
     }

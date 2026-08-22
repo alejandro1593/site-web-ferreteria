@@ -77,16 +77,16 @@ function renderProductos(data) {
         return `
             <div class="product-card">
                 <div style="width: 100%; height: 200px; overflow: hidden; background: #f5f5f5; display: flex; align-items: center; justify-content: center;">
-                    <img src="${producto.imagen}" 
-                         alt="${producto.nombre}" 
+                    <img src="${esc(producto.imagen)}" 
+                         alt="${esc(producto.nombre)}" 
                          class="product-image" 
                          style="display: block; max-width: 100%; max-height: 100%; object-fit: contain;"
                          onerror="console.log('❌ Error cargando imagen:', this.src); this.src='https://via.placeholder.com/400?text=No+Image'; this.onerror=null;">
                 </div>
                 <div class="product-info">
-                    <h4>${producto.nombre}</h4>
-                    <p><small>Código: ${producto.codigo}</small></p>
-                    <p><small>${producto.categoria_nombre}</small></p>
+                    <h4>${esc(producto.nombre)}</h4>
+                    <p><small>Código: ${esc(producto.codigo)}</small></p>
+                    <p><small>${esc(producto.categoria_nombre)}</small></p>
                     <p class="price">$${parseFloat(producto.precio_venta).toFixed(2)}</p>
                     <p>Stock: ${producto.stock_actual}</p>
                     <span class="stock-indicator ${stockClass}">${stockText}</span>

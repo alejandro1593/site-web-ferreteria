@@ -70,13 +70,13 @@ async function loadVentas() {
             <tr>
                 <td>#${venta.id_venta}</td>
                 <td>${formatDate(venta.fecha)}</td>
-                <td>${venta.cliente_nombre || 'Sin cliente'}</td>
+                <td>${esc(venta.cliente_nombre) || 'Sin cliente'}</td>
                 <td>
                     <span class="status-badge status-${venta.estado === 'completada' ? 'active' : 'pending'}">
-                        ${venta.estado}
+                        ${esc(venta.estado)}
                     </span>
                 </td>
-                <td>${venta.metodo_pago}</td>
+                <td>${esc(venta.metodo_pago)}</td>
                 <td>${venta.total_items || 0}</td>
                 <td>${formatCurrency(venta.subtotal || 0)}</td>
                 <td>${formatCurrency(venta.iva || 0)}</td>

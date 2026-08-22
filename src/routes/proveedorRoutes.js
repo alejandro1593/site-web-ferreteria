@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const ProveedorController = require('../controllers/ProveedorController');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+
+const adminOGerente = roleMiddleware(['admin', 'gerente']);
 
 // GET /api/proveedores - Obtener todos los proveedores
 router.get('/', authMiddleware, ProveedorController.getAll);
@@ -12,13 +14,13 @@ router.get('/:id', authMiddleware, ProveedorController.getById);
 // GET /api/proveedores/search?nombre=xxx - Buscar proveedor por nombre
 router.get('/search', authMiddleware, ProveedorController.search);
 
-// POST /api/proveedores - Crear nuevo proveedor
-router.post('/', authMiddleware, ProveedorController.create);
+// POST /api/proveedores - Crear nuevo proveedor (solo admin/gerente)
+router.post('/', authMiddleware, adminOGerente, ProveedorController.create);
 
-// PUT /api/proveedores/:id - Actualizar proveedor
-router.put('/:id', authMiddleware, ProveedorController.update);
+// PUT /api/proveedores/:id - Actualizar proveedor (solo admin/gerente)
+router.put('/:id', authMiddleware, adminOGerente, ProveedorController.update);
 
-// DELETE /api/proveedores/:id - Eliminar proveedor
-router.delete('/:id', authMiddleware, ProveedorController.delete);
+// DELETE /api/proveedores/:id - Eliminar proveedor (solo admin/gerente)
+router.delete('/:id', authMiddleware, adminOGerente, ProveedorController.delete);
 
 module.exports = router;

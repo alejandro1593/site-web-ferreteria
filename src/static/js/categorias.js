@@ -35,8 +35,8 @@ function renderCategorias(data) {
     tbody.innerHTML = data.map(cat => `
         <tr>
             <td>${cat.id_categoria}</td>
-            <td><strong>${cat.nombre}</strong></td>
-            <td>${cat.descripcion || '-'}</td>
+            <td><strong>${esc(cat.nombre)}</strong></td>
+            <td>${esc(cat.descripcion) || '-'}</td>
             <td>
                 <button class="btn btn-info btn-sm" onclick="editCategoria(${cat.id_categoria})">
                     ✏️ Editar

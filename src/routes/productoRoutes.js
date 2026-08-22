@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const ProductoController = require('../controllers/ProductoController');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+
+const adminOGerente = roleMiddleware(['admin', 'gerente']);
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -51,22 +53,22 @@ router.get('/codigo/:codigo', authMiddleware, ProductoController.getByCodigo);
 // GET /api/productos/:id - Obtener un producto por ID
 router.get('/:id', authMiddleware, ProductoController.getById);
 
-// POST /api/productos - Crear nuevo producto
-router.post('/', authMiddleware, ProductoController.create);
+// POST /api/productos - Crear nuevo producto (solo admin/gerente)
+router.post('/', authMiddleware, adminOGerente, ProductoController.create);
 
-// POST /api/productos/upload - Crear nuevo producto con imagen
-router.post('/upload', authMiddleware, upload.single('imagen'), ProductoController.createWithImage);
+// POST /api/productos/upload - Crear nuevo producto con imagen (solo admin/gerente)
+router.post('/upload', authMiddleware, adminOGerente, upload.single('imagen'), ProductoController.createWithImage);
 
-// PUT /api/productos/:id - Actualizar producto
-router.put('/:id', authMiddleware, ProductoController.update);
+// PUT /api/productos/:id - Actualizar producto (solo admin/gerente)
+router.put('/:id', authMiddleware, adminOGerente, ProductoController.update);
 
-// DELETE /api/productos/:id - Eliminar producto (soft delete)
-router.delete('/:id', authMiddleware, ProductoController.delete);
+// DELETE /api/productos/:id - Eliminar producto (solo admin/gerente)
+router.delete('/:id', authMiddleware, adminOGerente, ProductoController.delete);
 
-// PUT /api/productos/:id/stock - Actualizar stock de producto
-router.put('/:id/stock', authMiddleware, ProductoController.updateStock);
+// PUT /api/productos/:id/stock - Actualizar stock de producto (solo admin/gerente)
+router.put('/:id/stock', authMiddleware, adminOGerente, ProductoController.updateStock);
 
-// POST /api/productos/:id/upload - Subir imagen de producto
-router.post('/:id/upload', authMiddleware, upload.single('imagen'), ProductoController.uploadImage);
+// POST /api/productos/:id/upload - Subir imagen de producto (solo admin/gerente)
+router.post('/:id/upload', authMiddleware, adminOGerente, upload.single('imagen'), ProductoController.uploadImage);
 
 module.exports = router;

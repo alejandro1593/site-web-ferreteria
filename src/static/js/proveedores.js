@@ -33,10 +33,10 @@ function renderProveedores(data) {
     tbody.innerHTML = data.map(prov => `
         <tr>
             <td>${prov.id_proveedor}</td>
-            <td><strong>${prov.nombre}</strong></td>
-            <td>${prov.contacto || '-'}</td>
-            <td>${prov.telefono || '-'}</td>
-            <td>${prov.email || '-'}</td>
+            <td><strong>${esc(prov.nombre)}</strong></td>
+            <td>${esc(prov.contacto) || '-'}</td>
+            <td>${esc(prov.telefono) || '-'}</td>
+            <td>${esc(prov.email) || '-'}</td>
             <td>
                 <button class="btn btn-info btn-sm" onclick="editProveedor(${prov.id_proveedor})">
                     ✏️ Editar

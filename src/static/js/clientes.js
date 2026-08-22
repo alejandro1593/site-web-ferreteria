@@ -35,11 +35,11 @@ function renderClientes(data) {
     tbody.innerHTML = data.map(cli => `
         <tr>
             <td>${cli.id_cliente}</td>
-            <td><strong>${cli.nombre}</strong></td>
-            <td>${cli.apellido || '-'}</td>
-            <td>${cli.dni || '-'}</td>
-            <td>${cli.telefono || '-'}</td>
-            <td>${cli.email || '-'}</td>
+            <td><strong>${esc(cli.nombre)}</strong></td>
+            <td>${esc(cli.apellido) || '-'}</td>
+            <td>${esc(cli.dni) || '-'}</td>
+            <td>${esc(cli.telefono) || '-'}</td>
+            <td>${esc(cli.email) || '-'}</td>
             <td>
                 <button class="btn btn-success btn-sm" onclick="verHistorialCliente(${cli.id_cliente})" title="Ver historial de compras">
                     🛒 Historial

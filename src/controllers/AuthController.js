@@ -8,11 +8,8 @@ const AuthController = {
   login: async (req, res) => {
     const { username, password } = req.body || {};
 
-    console.log('Intento de login para username:', username);
-
     // Validar campos requeridos
     if (!username || !password) {
-      console.log('Error: Username y password son requeridos');
       return res.status(400).json({ error: 'Username y password son requeridos' });
     }
 
@@ -23,10 +20,7 @@ const AuthController = {
         [username]
       );
 
-      console.log('Usuario encontrado:', results.length > 0 ? 'Sí' : 'No');
-
       if (results.length === 0) {
-        console.log('Error: Usuario no encontrado');
         return res.status(401).json({ error: 'Credenciales inválidas' });
       }
 
@@ -34,16 +28,13 @@ const AuthController = {
 
       // Verificar si el usuario está activo
       if (!usuario.activo) {
-        console.log('Error: Usuario inactivo');
         return res.status(401).json({ error: 'Usuario inactivo. Contacte al administrador' });
       }
 
       // Comparar contraseña hasheada
       const passwordValida = await bcrypt.compare(password, usuario.password);
-      console.log('Contraseña válida:', passwordValida);
 
       if (!passwordValida) {
-        console.log('Error: Contraseña inválida');
         return res.status(401).json({ error: 'Credenciales inválidas' });
       }
 
@@ -57,10 +48,8 @@ const AuthController = {
           rol: usuario.rol
         },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
-
-      console.log('Token generado exitosamente');
 
       // Preparar datos de respuesta (sin password)
       const usuarioResponse = {
@@ -97,6 +86,10 @@ const AuthController = {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
 
+    // Validar que el rol sea uno de los permitidos
+    const ROLES_VALIDOS = ['admin', 'gerente', 'supervisor', 'vendedor', 'cajero', 'almacen'];
+    const rolFinal = ROLES_VALIDOS.includes(rol) ? rol : 'vendedor';
+
     // Hash de la contraseña antes de guardar
     bcrypt.hash(password, 10, (err, hashedPassword) => {
       if (err) {
@@ -110,7 +103,7 @@ const AuthController = {
         password: hashedPassword,
         nombre,
         email,
-        rol: rol || 'vendedor'
+        rol: rolFinal
       }, (err, result) => {
         if (err) {
           if (err.code === 'ER_DUP_ENTRY') {

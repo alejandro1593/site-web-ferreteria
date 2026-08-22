@@ -74,7 +74,7 @@ async function loadRecentSales() {
         tbody.innerHTML = recentSales.map(venta => `
             <tr>
                 <td>#${venta.id_venta}</td>
-                <td>${venta.cliente_nombre || 'Sin cliente'}</td>
+                <td>${esc(venta.cliente_nombre) || 'Sin cliente'}</td>
                 <td>${formatDate(venta.fecha)}</td>
                 <td>
                     <span class="status-badge status-${venta.estado === 'completada' ? 'active' : 'pending'}">
@@ -123,11 +123,11 @@ async function loadLowStockProducts() {
             return `
                 <tr>
                     <td>
-                        <strong>${producto.nombre}</strong>
+                        <strong>${esc(producto.nombre)}</strong>
                         <br>
-                        <small>${producto.categoria_nombre}</small>
+                        <small>${esc(producto.categoria_nombre)}</small>
                     </td>
-                    <td><code>${producto.codigo}</code></td>
+                    <td><code>${esc(producto.codigo)}</code></td>
                     <td>
                         <span class="stock-indicator ${stockStatus}">
                             ${producto.stock_actual}

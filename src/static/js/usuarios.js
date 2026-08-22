@@ -35,9 +35,9 @@ function renderUsuarios(data) {
     tbody.innerHTML = data.map(usu => `
         <tr>
             <td>${usu.id_usuario}</td>
-            <td><strong>${usu.username}</strong></td>
-            <td>${usu.nombre}</td>
-            <td>${usu.email || '-'}</td>
+            <td><strong>${esc(usu.username)}</strong></td>
+            <td>${esc(usu.nombre)}</td>
+            <td>${esc(usu.email) || '-'}</td>
             <td>
                 <span class="status-badge ${usu.rol === 'admin' ? 'status-active' : 'status-pending'}">
                     ${usu.rol}

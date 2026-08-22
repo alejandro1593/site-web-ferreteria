@@ -1,5 +1,16 @@
 const API_BASE_URL = 'http://localhost:3000/api';
 
+// Escapar HTML para prevenir XSS al renderizar datos con innerHTML
+function esc(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 async function fetchAPI(endpoint, options = {}) {
     let url = endpoint;
     
