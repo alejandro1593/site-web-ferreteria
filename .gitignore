@@ -48,3 +48,8 @@ seed_usuarios_ventas.js
 
 # Test scripts
 test_query.js
+
+# Scripts con credenciales en texto plano (NUNCA subir a GitHub)
+scripts/auditar_accesos.js
+scripts/rotar_passwords.js
+scripts/.passwords_local.txt
