@@ -3,6 +3,8 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 // Importar modelos
@@ -59,6 +61,32 @@ const upload = multer({
 });
 
 // Middlewares básicos
+app.use(helmet({
+  contentSecurityPolicy: false // Las vistas usan scripts/estilos inline
+}));
+
+// Limitador general para la API: máx 300 peticiones por minuto por IP
+// (se desactiva en tests para no interferir con Jest)
+const enTests = process.env.NODE_ENV === 'test';
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => enTests,
+  message: { error: 'Demasiadas peticiones, intente más tarde' }
+});
+
+// Limitador estricto para autenticación: máx 10 intentos cada 15 minutos (fuerza bruta)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => enTests,
+  message: { error: 'Demasiados intentos. Espere 15 minutos antes de volver a intentar' }
+});
+
 app.use(cors({
     origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.1.5:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -77,11 +105,15 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Montar rutas
 app.use('/', viewRoutes);
-app.use('/api', apiRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api', apiLimiter, apiRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 
-// Servidor
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-});
+// Servidor (no se inicia cuando app.js es importado por los tests)
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

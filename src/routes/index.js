@@ -12,6 +12,9 @@ const ventaDetalleRoutes = require('./ventaDetalleRoutes');
 const devolucionRoutes = require('./devolucionRoutes');
 const cajaRoutes = require('./cajaRoutes');
 const cotizacionRoutes = require('./cotizacionRoutes');
+const compraRoutes = require('./compraRoutes');
+const ajusteRoutes = require('./ajusteRoutes');
+const logRoutes = require('./logRoutes');
 
 // Montar todas las rutas
 router.use('/categorias', categoriaRoutes);
@@ -24,6 +27,9 @@ router.use('/venta-detalles', ventaDetalleRoutes);
 router.use('/devoluciones', devolucionRoutes);
 router.use('/caja', cajaRoutes);
 router.use('/cotizaciones', cotizacionRoutes);
+router.use('/compras', compraRoutes);
+router.use('/ajustes', ajusteRoutes);
+router.use('/logs', logRoutes);
 
 // Ruta raíz para API
 router.get('/', (req, res) => {
@@ -37,7 +43,10 @@ router.get('/', (req, res) => {
             'GET /api/usuarios',
             'GET /api/productos',
             'GET /api/ventas',
-            'GET /api/venta-detalles'
+            'GET /api/venta-detalles',
+            'GET /api/compras',
+            'GET /api/ajustes',
+            'GET /api/logs'
         ]
     });
 });

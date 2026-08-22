@@ -1,5 +1,6 @@
 const Usuario = require('../models/Usuario');
 const bcrypt = require('bcrypt');
+const { registrarAccion } = require('../utils/audit');
 
 const UsuarioController = {
   // Obtener todos los usuarios (sin password)
@@ -38,7 +39,7 @@ const UsuarioController = {
 
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
-      Usuario.create({ 
+        Usuario.create({ 
         username, 
         password: hashedPassword, 
         nombre, 
@@ -52,6 +53,7 @@ const UsuarioController = {
           }
           return res.status(500).json({ error: 'Error al crear usuario' });
         }
+        registrarAccion(req, 'crear', 'usuario', result.insertId, `${username} (${rol})`);
         res.status(201).json({ message: 'Usuario creado exitosamente', id: result.insertId });
       });
     } catch (error) {
@@ -118,6 +120,7 @@ const UsuarioController = {
         if (err) {
           return res.status(500).json({ error: 'Error al eliminar usuario' });
         }
+        registrarAccion(req, 'eliminar', 'usuario', id, results[0].username);
         res.json({ message: 'Usuario eliminado exitosamente' });
       });
     });

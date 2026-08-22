@@ -171,8 +171,71 @@ async function verDetallesVenta(idVenta) {
     }
 }
 
-async function exportarVentasCSV() {
+// ---- Ventas a crédito (fiados) ----
+
+async function loadCrediticias() {
+    const tbody = document.getElementById('crediticias-tbody');
+    if (!tbody) return;
+
     try {
+        const creditos = await fetchAPIAuth('/ventas/crediticias');
+
+        if (creditos.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="6" class="empty-state">✅ No hay ventas con saldo pendiente</td></tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = creditos.map(v => `
+            <tr>
+                <td>#${v.id_venta}</td>
+                <td>${formatDate(v.fecha)}</td>
+                <td><strong>${esc(v.cliente_nombre) || 'Sin cliente'}</strong></td>
+                <td>${formatCurrency(v.total)}</td>
+                <td style="color: #c0392b;"><strong>${formatCurrency(v.saldo_pendiente)}</strong></td>
+                <td class="text-center">
+                    <button class="btn btn-success btn-sm" onclick="abonarVenta(${v.id_venta}, ${parseFloat(v.saldo_pendiente)})">
+                        💵 Abonar
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        tbody.innerHTML = `
+            <tr><td colspan="6" class="alert alert-danger">Error al cargar créditos</td></tr>
+        `;
+    }
+}
+
+async function abonarVenta(idVenta, saldoPendiente) {
+    const monto = prompt(`Abono a venta #${idVenta} (saldo: $${saldoPendiente.toFixed(2)}).\nIngrese el monto:`, saldoPendiente.toFixed(2));
+    if (monto === null) return;
+
+    const montoNum = parseFloat(monto);
+    if (isNaN(montoNum) || montoNum <= 0) {
+        showNotification('Monto inválido', 'error');
+        return;
+    }
+
+    try {
+        const resultado = await fetchAPIAuth(`/ventas/${idVenta}/abonar`, {
+            method: 'POST',
+            body: { monto: montoNum }
+        });
+
+        if (resultado.pagado) {
+            showNotification('✅ Crédito saldado por completo', 'success');
+        } else {
+            showNotification(`Abono registrado. Saldo restante: $${resultado.saldo_pendiente.toFixed(2)}`, 'success');
+        }
+        loadCrediticias();
+    } catch (error) {
+        showNotification(error.message || 'Error al registrar el abono', 'error');
+    }
+}
+
+async function exportarVentasCSV() {    try {
         const ventas = await fetchAPIAuth('/ventas');
         
         let csv = 'ID,Fecha,Cliente,Estado,MetodoPago,Items,Subtotal,IVA,Descuento,Total\n';
@@ -201,4 +264,5 @@ async function exportarVentasCSV() {
 document.addEventListener('DOMContentLoaded', () => {
     loadVentasStats();
     loadVentas();
+    loadCrediticias();
 });

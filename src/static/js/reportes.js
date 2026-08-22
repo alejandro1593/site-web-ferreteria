@@ -16,6 +16,46 @@ async function loadReportes() {
     await loadSummary(fechaInicio, fechaFin);
     await loadTopProductos();
     await loadVentasPorCategoria();
+    await loadGanancias(fechaInicio, fechaFin);
+}
+
+// Cargar ganancias del período (ingresos vs costo estimado)
+async function loadGanancias(fechaInicio, fechaFin) {
+    const container = document.getElementById('ganancias-content');
+    if (!container) return;
+
+    try {
+        const g = await fetchAPIAuth(`/ventas/ganancias?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
+
+        container.innerHTML = `
+            <div class="summary-grid">
+                <div class="summary-item" style="background: #e8f5e9; color: #1b5e20; border-radius: 10px;">
+                    <h4>💵 Ganancia Estimada</h4>
+                    <div class="value">${formatCurrency(g.ganancia_estimada || 0)}</div>
+                </div>
+                <div class="summary-item">
+                    <h4>🛒 Ingresos Brutos</h4>
+                    <div class="value">${formatCurrency(g.ingresos_brutos || 0)}</div>
+                </div>
+                <div class="summary-item">
+                    <h4>📦 Costo Estimado</h4>
+                    <div class="value">${formatCurrency(g.costo_estimado || 0)}</div>
+                </div>
+                <div class="summary-item">
+                    <h4>📊 Margen</h4>
+                    <div class="value">${g.margen_porcentaje !== null && g.margen_porcentaje !== undefined ? g.margen_porcentaje + '%' : '-'}</div>
+                </div>
+            </div>
+            <p style="margin-top: 15px; color: #666;">
+                <small>⚠️ El costo se estima con el precio de compra actual de cada producto.</small>
+            </p>
+        `;
+    } catch (error) {
+        console.error('Error cargando ganancias:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger">Error al cargar ganancias</div>
+        `;
+    }
 }
 
 // Cargar resumen de ventas

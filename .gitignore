@@ -26,6 +26,9 @@ Thumbs.db
 logs/
 *.log
 
+# Backups de base de datos
+backups/
+
 # Test files (temporary)
 test-*.html
 test-*.js

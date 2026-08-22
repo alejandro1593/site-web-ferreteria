@@ -23,6 +23,7 @@
             <a href="/usuarios.html"><i>👤</i> Usuarios</a>
             <a href="/productos.html"><i>📦</i> Productos</a>
             <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/compras.html"><i>🛍️</i> Compras</a>
             <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
             <a href="/reportes.html"><i>📈</i> Reportes</a>
             <a href="/api.html"><i>🔧</i> API Docs</a>
@@ -44,6 +45,33 @@
             <div class="card-body">
                 <div class="stats-grid" id="ventas-stats">
                     <div class="loading-spinner">Cargando estadísticas...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content-card">
+            <div class="card-header">
+                <h3>💳 Ventas a Crédito (Fiados)</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="crediticias-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Total</th>
+                                <th>Saldo Pendiente</th>
+                                <th class="text-center">Abonar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="crediticias-tbody">
+                            <tr>
+                                <td colspan="6" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

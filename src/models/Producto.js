@@ -33,8 +33,13 @@ const Producto = {
   },
 
   // Obtener todos los productos con sus relaciones
-  findAll: (callback) => {
-    const sql = `
+  // Opcionalmente acepta { limit, offset } para paginación
+  findAll: (options, callback) => {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
+    let sql = `
       SELECT p.*, c.nombre as categoria_nombre, pr.nombre as proveedor_nombre 
       FROM productos p 
       LEFT JOIN categorias c ON p.id_categoria = c.id_categoria 
@@ -42,7 +47,17 @@ const Producto = {
       WHERE p.activo = TRUE 
       ORDER BY p.nombre ASC
     `;
-    connection.query(sql, callback);
+    const params = [];
+    if (options.limit) {
+      sql += ' LIMIT ? OFFSET ?';
+      params.push(Number(options.limit), Number(options.offset || 0));
+    }
+    connection.query(sql, params, callback);
+  },
+
+  // Contar productos activos
+  countAll: (callback) => {
+    connection.query('SELECT COUNT(*) AS total FROM productos WHERE activo = TRUE', callback);
   },
 
   // Obtener producto por ID

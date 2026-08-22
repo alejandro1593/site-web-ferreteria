@@ -155,6 +155,7 @@
             <a href="/usuarios.html"><i>👤</i> Usuarios</a>
             <a href="/productos.html"><i>📦</i> Productos</a>
             <a href="/ventas.html" class="active"><i>💰</i> Ventas</a>
+            <a href="/compras.html"><i>🛍️</i> Compras</a>
             <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
             <a href="/devoluciones.html"><i>↩️</i> Devoluciones</a>
             <a href="/caja.html"><i>💵</i> Caja</a>
@@ -177,6 +178,10 @@
         <div class="pos-container">
             <div class="products-section">
                 <h3>📦 Seleccionar Productos</h3>
+                <input type="text" id="codigo-barras" 
+                       class="search-product" 
+                       placeholder="📷 Escanear código de barras (Enter para agregar)..." 
+                       autocomplete="off">
                 <input type="text" id="search-producto-pos" 
                        class="search-product" 
                        placeholder="🔍 Buscar productos..." 
@@ -203,6 +208,7 @@
                         <option value="efectivo">Efectivo</option>
                         <option value="tarjeta">Tarjeta</option>
                         <option value="transferencia">Transferencia</option>
+                        <option value="credito">Crédito (fiado)</option>
                     </select>
                 </div>
                 

@@ -28,8 +28,13 @@ const Venta = {
   },
 
   // Obtener todas las ventas con cliente y total de items
-  findAll: (callback) => {
-    const sql = `
+  // Opcionalmente acepta { limit, offset } para paginación
+  findAll: (options, callback) => {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
+    let sql = `
       SELECT v.*, 
         CONCAT(c.nombre, ' ', c.apellido) as cliente_nombre, 
         c.dni as cliente_dni,
@@ -40,7 +45,12 @@ const Venta = {
       GROUP BY v.id_venta
       ORDER BY v.fecha DESC
     `;
-    connection.query(sql, callback);
+    const params = [];
+    if (options.limit) {
+      sql += ' LIMIT ? OFFSET ?';
+      params.push(Number(options.limit), Number(options.offset || 0));
+    }
+    connection.query(sql, params, callback);
   },
 
   // Obtener venta por ID con detalles
@@ -87,17 +97,18 @@ const Venta = {
   // Crear nueva venta
   create: (data, callback) => {
     const sql = `
-      INSERT INTO ventas (id_cliente, subtotal, iva, descuento, total, metodo_pago, estado) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ventas (id_cliente, subtotal, iva, descuento, total, metodo_pago, estado, saldo_pendiente) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     connection.query(sql, [
-      data.id_cliente, 
+      data.id_cliente || null, 
       data.subtotal, 
       data.iva, 
       data.descuento || 0, 
       data.total, 
       data.metodo_pago, 
-      data.estado || 'completada'
+      data.estado || 'completada',
+      data.saldo_pendiente || 0
     ], callback);
   },
 
@@ -193,6 +204,65 @@ const Venta = {
       WHERE v.id_cliente = ? AND v.fecha BETWEEN ? AND ? AND v.estado = 'completada'
     `;
     connection.query(sql, [idCliente, fechaInicio, fechaFin], callback);
+  },
+
+  // ---- Créditos (fiados) ----
+
+  // Ventas con saldo pendiente
+  findCrediticias: (callback) => {
+    const sql = `
+      SELECT v.*, 
+        CONCAT(c.nombre, ' ', c.apellido) as cliente_nombre,
+        c.telefono as cliente_telefono
+      FROM ventas v 
+      LEFT JOIN clientes c ON v.id_cliente = c.id_cliente 
+       WHERE v.saldo_pendiente > 0
+       ORDER BY v.fecha ASC
+    `;
+    connection.query(sql, callback);
+  },
+
+  // Registrar abono a una venta a crédito
+  abonar: (id, monto, callback) => {
+    connection.query(
+      'SELECT total, saldo_pendiente FROM ventas WHERE id_venta = ? FOR UPDATE',
+      [id],
+      (err, results) => {
+        if (err) return callback(err);
+        if (results.length === 0) return callback({ message: 'Venta no encontrada' });
+
+        const venta = results[0];
+        const nuevoSaldo = Math.max(venta.saldo_pendiente - monto, 0);
+
+        connection.query(
+          'UPDATE ventas SET saldo_pendiente = ?, estado = IF(? <= 0, \'completada\', \'pendiente\') WHERE id_venta = ?',
+          [nuevoSaldo, nuevoSaldo, id],
+          (err) => callback(err, { saldo_anterior: venta.saldo_pendiente, saldo_nuevo: nuevoSaldo })
+        );
+      }
+    );
+  },
+
+  // ---- Ganancias (usa precio de compra como costo aproximado) ----
+
+  getGanancias: (fechaInicio, fechaFin, callback) => {
+    const sql = `
+      SELECT 
+        COUNT(DISTINCT v.id_venta) as total_ventas,
+        SUM(vd.cantidad) as productos_vendidos,
+        SUM(vd.subtotal) as ingresos_brutos,
+        SUM(vd.cantidad * p.precio_compra) as costo_estimado,
+        SUM(vd.subtotal - vd.cantidad * p.precio_compra) as ganancia_estimada,
+        ROUND(
+          SUM(vd.subtotal - vd.cantidad * p.precio_compra) / NULLIF(SUM(vd.subtotal), 0) * 100, 2
+        ) as margen_porcentaje
+      FROM venta_detalle vd
+      JOIN ventas v ON vd.id_venta = v.id_venta
+      LEFT JOIN productos p ON vd.id_producto = p.id_producto
+      WHERE DATE(v.fecha) BETWEEN ? AND ?
+        AND v.estado = 'completada'
+    `;
+    connection.query(sql, [fechaInicio, fechaFin], callback);
   }
 };
 

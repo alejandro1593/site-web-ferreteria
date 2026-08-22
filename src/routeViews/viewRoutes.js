@@ -76,6 +76,14 @@ router.get('/ventas.html', (req, res) => {
     res.sendFile(path.join(viewsPath, 'ventas.html'));
 });
 
+router.get('/compras', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'compras.html'));
+});
+
+router.get('/compras.html', (req, res) => {
+    res.sendFile(path.join(viewsPath, 'compras.html'));
+});
+
 router.get('/historial-clientes', (req, res) => {
     res.sendFile(path.join(viewsPath, 'historial-clientes.html'));
 });

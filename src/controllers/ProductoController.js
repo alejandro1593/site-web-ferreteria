@@ -1,13 +1,25 @@
 const Producto = require('../models/Producto');
+const { registrarAccion } = require('../utils/audit');
 
 const ProductoController = {
-   // Obtener todos los productos
+   // Obtener todos los productos (soporta ?page=1&limit=50)
    getAll: (req, res) => {
-     Producto.findAll((err, results) => {
+     const { page, limit } = req.query;
+     const options = {};
+     if (page && limit) {
+       options.limit = Math.min(Number(limit), 200);
+       options.offset = (Math.max(Number(page), 1) - 1) * options.limit;
+     }
+     Producto.findAll(options, (err, results) => {
        if (err) {
          return res.status(500).json({ error: 'Error al obtener productos' });
        }
-       res.json(results);
+       Producto.countAll((err2, countResults) => {
+         if (!err2) {
+           res.set('X-Total-Count', String(countResults[0].total));
+         }
+         res.json(results);
+       });
      });
    },
 
@@ -174,12 +186,13 @@ const ProductoController = {
          return res.status(404).json({ error: 'Producto no encontrado' });
        }
 
-       Producto.delete(id, (err, result) => {
-         if (err) {
-           return res.status(500).json({ error: 'Error al eliminar producto' });
-         }
-         res.json({ message: 'Producto eliminado exitosamente' });
-       });
+        Producto.delete(id, (err, result) => {
+          if (err) {
+            return res.status(500).json({ error: 'Error al eliminar producto' });
+          }
+          registrarAccion(req, 'eliminar', 'producto', id, results[0].nombre);
+          res.json({ message: 'Producto eliminado exitosamente' });
+        });
      });
    },
 

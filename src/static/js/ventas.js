@@ -70,6 +70,32 @@ function searchProductosPOS() {
     renderProductosPOS(filtered);
 }
 
+// Escáner de código de barras: el lector escribe el código y presiona Enter
+function initEscanerCodigoBarras() {
+    const input = document.getElementById('codigo-barras');
+    if (!input) return;
+
+    input.addEventListener('keypress', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+
+        const codigo = input.value.trim();
+        if (!codigo) return;
+
+        const producto = productos.find(p => p.codigo === codigo);
+
+        if (!producto) {
+            showNotification(`Código "${codigo}" no encontrado`, 'error');
+        } else {
+            agregarAlCarrito(producto.id_producto);
+            showNotification(`➕ ${producto.nombre}`, 'success');
+        }
+
+        input.value = '';
+        input.focus();
+    });
+}
+
 // Agregar producto al carrito
 function agregarAlCarrito(idProducto) {
     const productoExistente = carrito.find(item => item.id_producto === idProducto);
@@ -185,6 +211,12 @@ async function procesarVenta() {
     const idCliente = document.getElementById('cliente-select').value;
     const metodoPago = document.getElementById('metodo-pago').value;
     const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+
+    // Las ventas a crédito requieren cliente registrado
+    if (metodoPago === 'credito' && !idCliente) {
+        showNotification('Las ventas a crédito requieren un cliente registrado', 'warning');
+        return;
+    }
     
     const subtotal = carrito.reduce((sum, item) => sum + (item.precio_venta * item.cantidad), 0);
     const iva = subtotal * 0.16;
@@ -206,7 +238,10 @@ async function procesarVenta() {
             body: ventaData
         });
 
-        showNotification(`Venta procesada exitosamente. Total: $${total.toFixed(2)}`, 'success');
+        const msgCredito = metodoPago === 'credito'
+            ? ` Queda fiado por $${venta.saldo_pendiente.toFixed(2)}`
+            : '';
+        showNotification(`Venta procesada. Total: $${total.toFixed(2)}.${msgCredito}`, 'success');
 
         // Limpiar carrito
         carrito = [];
@@ -224,4 +259,5 @@ async function procesarVenta() {
 document.addEventListener('DOMContentLoaded', () => {
     loadClientes();
     loadProductosPOS();
+    initEscanerCodigoBarras();
 });

@@ -1,11 +1,18 @@
 const Venta = require('../models/Venta');
 const VentaDetalle = require('../models/VentaDetalle');
 const Producto = require('../models/Producto');
+const { registrarAccion } = require('../utils/audit');
 
 const VentaController = {
-  // Obtener todas las ventas
+  // Obtener todas las ventas (soporta ?page=1&limit=50)
   getAll: (req, res) => {
-    Venta.findAll((err, results) => {
+    const { page, limit } = req.query;
+    const options = {};
+    if (page && limit) {
+      options.limit = Math.min(Number(limit), 200);
+      options.offset = (Math.max(Number(page), 1) - 1) * options.limit;
+    }
+    Venta.findAll(options, (err, results) => {
       if (err) {
         return res.status(500).json({ error: 'Error al obtener ventas' });
       }
@@ -136,6 +143,11 @@ const VentaController = {
       return res.status(400).json({ error: 'Se debe incluir al menos un detalle' });
     }
 
+    const esCredito = metodo_pago === 'credito';
+    if (esCredito && !id_cliente) {
+      return res.status(400).json({ error: 'Las ventas a crédito requieren un cliente registrado' });
+    }
+
     // Validar y procesar detalles
     let subtotal = 0;
     const promises = detalles.map(detalle => {
@@ -171,7 +183,8 @@ const VentaController = {
             descuento,
             total,
             metodo_pago,
-            estado: 'completada'
+            estado: esCredito ? 'pendiente' : 'completada',
+            saldo_pendiente: esCredito ? total : 0
           }, (err, result) => {
             if (err) {
               return res.status(500).json({ error: 'Error al crear venta' });
@@ -213,10 +226,12 @@ const VentaController = {
 
           Promise.all(detallePromises)
             .then(() => {
+              registrarAccion(req, 'crear', 'venta', idVenta, `Total ${total}${esCredito ? ' (crédito)' : ''}`);
               res.status(201).json({ 
                 message: 'Venta creada exitosamente', 
                 id: idVenta,
-                total 
+                total,
+                saldo_pendiente: esCredito ? total : 0
               });
             })
             .catch(err => {
@@ -245,8 +260,59 @@ const VentaController = {
         if (err) {
           return res.status(500).json({ error: 'Error al eliminar venta' });
         }
+        registrarAccion(req, 'eliminar', 'venta', id, `Total ${results[0].total}`);
         res.json({ message: 'Venta eliminada exitosamente' });
       });
+    });
+  },
+
+  // ---- Créditos (fiados) ----
+
+  // Ventas con saldo pendiente
+  getCrediticias: (req, res) => {
+    Venta.findCrediticias((err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al obtener ventas a crédito' });
+      res.json(results);
+    });
+  },
+
+  // Registrar abono a venta a crédito
+  abonar: (req, res) => {
+    const { id } = req.params;
+    const { monto } = req.body || {};
+
+    if (!monto || monto <= 0) {
+      return res.status(400).json({ error: 'El monto del abono debe ser mayor a 0' });
+    }
+
+    Venta.findById(id, (err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al verificar la venta' });
+      if (results.length === 0) return res.status(404).json({ error: 'Venta no encontrada' });
+      if (results[0].saldo_pendiente <= 0) return res.status(400).json({ error: 'La venta no tiene saldo pendiente' });
+
+      Venta.abonar(id, Number(monto), (err, resultado) => {
+        if (err) return res.status(500).json({ error: err.message || 'Error al registrar el abono' });
+        registrarAccion(req, 'abonar', 'venta', id, `Abono de ${monto}. Saldo restante: ${resultado.saldo_nuevo}`);
+        res.json({
+          message: 'Abono registrado exitosamente',
+          saldo_anterior: resultado.saldo_anterior,
+          saldo_pendiente: resultado.saldo_nuevo,
+          pagado: resultado.saldo_nuevo === 0
+        });
+      });
+    });
+  },
+
+  // ---- Ganancias ----
+
+  getGanancias: (req, res) => {
+    const { fechaInicio, fechaFin } = req.query;
+    if (!fechaInicio || !fechaFin) {
+      return res.status(400).json({ error: 'Fecha inicio y fecha fin son requeridas' });
+    }
+    Venta.getGanancias(fechaInicio, fechaFin, (err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al calcular ganancias' });
+      res.json(results[0]);
     });
   }
 };

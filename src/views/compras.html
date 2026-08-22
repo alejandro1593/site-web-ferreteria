@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compras - Sistema de Ferretería</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <button class="menu-toggle">☰</button>
+    
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏪 Ferretería</h2>
+            <p>Sistema de Gestión</p>
+        </div>
+        
+        <div class="sidebar-nav">
+            <a href="/dashboard.html"><i>📊</i> Dashboard</a>
+            <a href="/categorias.html"><i>📁</i> Categorías</a>
+            <a href="/proveedores.html"><i>🏢</i> Proveedores</a>
+            <a href="/clientes.html"><i>👥</i> Clientes</a>
+            <a href="/usuarios.html"><i>👤</i> Usuarios</a>
+            <a href="/productos.html"><i>📦</i> Productos</a>
+            <a href="/ventas.html"><i>💰</i> Ventas</a>
+            <a href="/compras.html" class="active"><i>🛍️</i> Compras</a>
+            <a href="/historial-clientes.html"><i>🛒</i> Historial Clientes</a>
+            <a href="/reportes.html"><i>📈</i> Reportes</a>
+            <a href="/api.html"><i>🔧</i> API Docs</a>
+        </div>
+        
+        <!-- Información de usuario (se cargará dinámicamente) -->
+        <div id="user-info"></div>
+    </nav>
+    
+    <main class="main-content">
+        <div class="page-header">
+            <h1>🛍️ Compras a Proveedores</h1>
+            <p>Registro de ingreso de mercadería (aumenta el stock)</p>
+        </div>
+
+        <div class="content-card">
+            <div class="card-header">
+                <h3>Historial de Compras</h3>
+                <div class="card-actions">
+                    <button class="btn btn-primary" onclick="openCompraModal()">
+                        ➕ Nueva Compra
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="compras-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha</th>
+                                <th>Proveedor</th>
+                                <th>Total</th>
+                                <th>Estado</th>
+                                <th>Registró</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="compras-tbody">
+                            <tr>
+                                <td colspan="7" class="loading-spinner">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Nueva Compra -->
+    <div id="compra-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nueva Compra</h3>
+                <button class="modal-close" onclick="closeModal('compra-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="compra-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="compra-proveedor">Proveedor *</label>
+                            <select id="compra-proveedor" required></select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Agregar productos</label>
+                        <div style="display:flex; gap:8px;">
+                            <select id="compra-producto" style="flex:1;"></select>
+                            <input type="number" id="compra-cantidad" placeholder="Cant." min="1" value="1" style="width:80px;">
+                            <input type="number" id="compra-costo" placeholder="Costo unit." min="0" step="0.01" style="width:110px;">
+                            <button type="button" class="btn btn-success btn-sm" onclick="agregarProductoCompra()">➕</button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table style="width:100%;">
+                            <thead>
+                                <tr><th>Producto</th><th>Cant.</th><th>Costo</th><th>Subtotal</th><th></th></tr>
+                            </thead>
+                            <tbody id="compra-items-tbody">
+                                <tr><td colspan="5" class="empty-state">Agregue productos a la compra</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p style="text-align:right;"><strong>Total: $<span id="compra-total">0.00</span></strong></p>
+
+                    <div class="form-group">
+                        <label for="compra-observaciones">Observaciones</label>
+                        <textarea id="compra-observaciones" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('compra-modal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveCompra()">Registrar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle de Compra -->
+    <div id="detalle-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="detalle-modal-title">Detalle de Compra</h3>
+                <button class="modal-close" onclick="closeModal('detalle-modal')">×</button>
+            </div>
+            <div class="modal-body" id="detalle-compra-content"></div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('detalle-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/compras.js"></script>
+</body>
+</html>

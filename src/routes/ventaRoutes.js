@@ -17,6 +17,12 @@ router.get('/today', authMiddleware, VentaController.getTodaySales);
 // GET /api/ventas/summary - Obtener resumen de ventas
 router.get('/summary', authMiddleware, VentaController.getSummary);
 
+// GET /api/ventas/crediticias - Ventas con saldo pendiente (fiados)
+router.get('/crediticias', authMiddleware, VentaController.getCrediticias);
+
+// GET /api/ventas/ganancias?fechaInicio=xxx&fechaFin=xxx - Ganancias por período
+router.get('/ganancias', authMiddleware, adminOGerente, VentaController.getGanancias);
+
 // GET /api/ventas/cliente/:idCliente - Obtener ventas por cliente
 router.get('/cliente/:idCliente', authMiddleware, VentaController.getByCliente);
 
@@ -34,5 +40,8 @@ router.post('/', authMiddleware, VentaController.create);
 
 // DELETE /api/ventas/:id - Eliminar venta (solo admin/gerente)
 router.delete('/:id', authMiddleware, adminOGerente, VentaController.delete);
+
+// POST /api/ventas/:id/abonar - Abonar a venta a crédito
+router.post('/:id/abonar', authMiddleware, VentaController.abonar);
 
 module.exports = router;
