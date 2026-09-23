@@ -5,6 +5,7 @@ const multer = require('multer');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+const { validateAuthConfig } = require('./config/auth_config');
 
 // Importar modelos
 require('./models/Categoria');
@@ -34,7 +35,7 @@ app.use(helmet({
       baseUri: ["'self'"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
@@ -86,6 +87,25 @@ app.use('/static', express.static(path.join(__dirname, 'static')));
 // Servir archivos subidos
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+const healthLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => enTests,
+  message: { status: 'degraded', database: 'rate_limited' }
+});
+
+app.get('/health', healthLimiter, async (req, res) => {
+  try {
+    const database = require('./config/db_postgres');
+    await database.pool.query('SELECT 1');
+    res.json({ status: 'ok', database: 'ok', timestamp: new Date().toISOString() });
+  } catch (error) {
+    res.status(503).json({ status: 'degraded', database: 'error', timestamp: new Date().toISOString() });
+  }
+});
+
 // Montar rutas
 app.use('/', viewRoutes);
 app.use('/api', apiLimiter, apiRoutes);
@@ -103,9 +123,8 @@ app.use((error, req, res, next) => {
 });
 
 function validateRuntimeConfig() {
-  const secret = process.env.JWT_SECRET || '';
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL no configurada');
-  if (secret.length < 32 || secret === 'genera_un_secreto_largo_y_aleatorio') throw new Error('JWT_SECRET inválido');
+  validateAuthConfig();
 }
 
 if (require.main === module) {
@@ -113,9 +132,19 @@ if (require.main === module) {
     validateRuntimeConfig();
     const PORT = process.env.PORT || 3000;
     const database = require('./config/db_postgres');
+    let server;
+    const shutdown = async () => {
+      if (server) {
+        await new Promise(resolve => server.close(resolve));
+      }
+      await database.pool.end();
+      process.exit(0);
+    };
+    process.once('SIGTERM', shutdown);
+    process.once('SIGINT', shutdown);
     database.pool.query('SELECT 1')
       .then(() => {
-        app.listen(PORT, () => {
+        server = app.listen(PORT, () => {
           console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
         });
       })

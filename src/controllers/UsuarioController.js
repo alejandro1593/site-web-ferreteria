@@ -1,6 +1,7 @@
 const Usuario = require('../models/Usuario');
 const bcrypt = require('bcryptjs');
 const { registrarAccion } = require('../utils/audit');
+const { isValidPassword } = require('../config/auth_config');
 
 const UsuarioController = {
   // Obtener todos los usuarios (sin password)
@@ -34,7 +35,7 @@ const UsuarioController = {
     if (!username || !password || !nombre) {
       return res.status(400).json({ error: 'Username, password y nombre son requeridos' });
     }
-    if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    if (!isValidPassword(password)) return res.status(400).json({ error: 'La contraseña debe tener entre 10 y 128 caracteres, incluir letras y números' });
 
     const ROLES_VALIDOS = ['admin', 'gerente', 'supervisor', 'vendedor', 'cajero', 'almacen'];
 
@@ -159,7 +160,7 @@ const UsuarioController = {
     if (!password) {
       return res.status(400).json({ error: 'El password es requerido' });
     }
-    if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    if (!isValidPassword(password)) return res.status(400).json({ error: 'La contraseña debe tener entre 10 y 128 caracteres, incluir letras y números' });
 
     try {
       const hashedPassword = await bcrypt.hash(password, 10);

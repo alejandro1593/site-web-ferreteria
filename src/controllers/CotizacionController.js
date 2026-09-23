@@ -1,7 +1,8 @@
 const connection = require('../config/db_postgres');
 const Cotizacion = require('../models/Cotizacion');
 const CotizacionDetalle = require('../models/CotizacionDetalle');
-const { registrarAccion } = require('../utils/audit');
+const Caja = require('../models/Caja');
+const { registrarAccionEnCliente } = require('../utils/audit');
 
 const METODOS_PAGO = new Set(['efectivo', 'tarjeta', 'transferencia', 'credito']);
 const ESTADOS = new Set(['pendiente', 'aprobada', 'rechazada', 'convertida']);
@@ -89,8 +90,9 @@ const CotizacionController = {
     }
 
     const descuentoGlobal = Number(req.body?.descuento_global ?? 0);
-    if (!Number.isFinite(descuentoGlobal) || descuentoGlobal < 0) {
-      return res.status(400).json({ error: 'El descuento global no es válido' });
+    const descuentoGlobalCentavos = Math.round(descuentoGlobal * 100);
+    if (!Number.isFinite(descuentoGlobal) || descuentoGlobal < 0 || Math.abs(descuentoGlobal * 100 - descuentoGlobalCentavos) > 0.000001) {
+      return res.status(400).json({ error: 'El descuento global no es válido ni tiene más de dos decimales' });
     }
 
     try {
@@ -111,36 +113,50 @@ const CotizacionController = {
         const lineas = productos.map((producto) => {
           const bruto = aCentavos(producto.precio_venta) * producto.cantidad;
           const descuento = Math.min(aCentavos(producto.descuento), bruto);
-          return { ...producto, subtotal: bruto - descuento };
+          return { ...producto, netoCentavos: bruto - descuento };
         });
         const brutoCentavos = lineas.reduce((sum, linea) => sum + aCentavos(linea.precio_venta) * linea.cantidad, 0);
-        const descuentoLineas = lineas.reduce((sum, linea) => sum + aCentavos(linea.precio_venta) * linea.cantidad - linea.subtotal, 0);
-        const subtotalCentavos = Math.max(brutoCentavos - descuentoLineas - aCentavos(descuentoGlobal), 0);
+        const descuentoLineasCentavos = lineas.reduce((sum, linea) => sum + aCentavos(linea.precio_venta) * linea.cantidad - linea.netoCentavos, 0);
+        const descuentoGlobalCentavos = aCentavos(descuentoGlobal);
+        const baseGlobalCentavos = lineas.reduce((sum, linea) => sum + linea.netoCentavos, 0);
+        if (descuentoGlobalCentavos > baseGlobalCentavos) throw crearError('El descuento global supera el importe de la cotización');
+        let descuentoGlobalAsignado = 0;
+        const lineasNetas = lineas.map((linea, index) => {
+          const descuentoGlobalLinea = index === lineas.length - 1
+            ? descuentoGlobalCentavos - descuentoGlobalAsignado
+            : Math.floor((descuentoGlobalCentavos * linea.netoCentavos) / (baseGlobalCentavos || 1));
+          descuentoGlobalAsignado += descuentoGlobalLinea;
+          return { ...linea, subtotalCentavos: linea.netoCentavos - descuentoGlobalLinea };
+        });
+        const subtotalCentavos = lineasNetas.reduce((sum, linea) => sum + linea.subtotalCentavos, 0);
         const ivaCentavos = Math.round(subtotalCentavos * 0.16);
         const totalCentavos = subtotalCentavos + ivaCentavos;
+        const descuentoTotalCentavos = descuentoLineasCentavos + descuentoGlobalCentavos;
         const observaciones = String(req.body?.observaciones || '').trim().slice(0, 2000);
 
         const quoteResult = await client.query(
           `INSERT INTO cotizaciones (id_cliente, fecha_validez, subtotal, iva, descuento, total, estado, observaciones, id_usuario)
            VALUES ($1, $2, $3, $4, $5, $6, 'pendiente', $7, $8)
            RETURNING id_cotizacion`,
-          [idCliente, fechaValidez, subtotalCentavos / 100, ivaCentavos / 100, (descuentoLineas + aCentavos(descuentoGlobal)) / 100, totalCentavos / 100, observaciones, req.user.id_usuario || null]
+           [idCliente, fechaValidez, subtotalCentavos / 100, ivaCentavos / 100, descuentoTotalCentavos / 100, totalCentavos / 100, observaciones, req.user.id_usuario || null]
+
         );
         const idCotizacion = quoteResult.rows[0].id_cotizacion;
 
-        for (const linea of lineas) {
+        for (const linea of lineasNetas) {
           await client.query(
             `INSERT INTO cotizacion_detalles (id_cotizacion, id_producto, cantidad, precio_unitario, descuento_producto, subtotal)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [idCotizacion, linea.id_producto, linea.cantidad, linea.precio_venta, (aCentavos(linea.precio_venta) * linea.cantidad - linea.subtotal) / 100, linea.subtotal / 100]
+            [idCotizacion, linea.id_producto, linea.cantidad, linea.precio_venta, (aCentavos(linea.precio_venta) * linea.cantidad - linea.netoCentavos) / 100, linea.subtotalCentavos / 100]
           );
         }
 
+        await registrarAccionEnCliente(client, req, 'crear', 'cotizacion', idCotizacion, `Total ${totalCentavos / 100}`);
         return { id: idCotizacion, total: totalCentavos / 100 };
       });
 
-      registrarAccion(req, 'crear', 'cotizacion', resultado.id, `Total ${resultado.total}`);
       res.status(201).json({ message: 'Cotizacion creada exitosamente', id: resultado.id, total: resultado.total });
+
     } catch (error) {
       const status = error.status || (error.code === '23503' ? 400 : 500);
       res.status(status).json({ error: status === 500 ? 'Error al crear cotizacion' : error.message });
@@ -223,6 +239,8 @@ const CotizacionController = {
 
     try {
       const resultado = await connection.withTransaction(async (client) => {
+        const caja = await Caja.findAbiertaConCliente(client, req.user.id_usuario);
+        if (!caja) throw crearError('Debes abrir una caja antes de convertir una cotización', 409);
         const quoteResult = await client.query(
           'SELECT * FROM cotizaciones WHERE id_cotizacion = $1 FOR UPDATE',
           [idCotizacion]
@@ -251,31 +269,47 @@ const CotizacionController = {
           productos.push({ ...detalle, nombre: producto.nombre });
         }
 
-        const brutoCentavos = productos.reduce((sum, detalle) => sum + aCentavos(detalle.precio_unitario) * detalle.cantidad, 0);
-        const descuentoCentavos = aCentavos(quote.descuento || 0);
-        const subtotalFinal = Math.max(brutoCentavos - descuentoCentavos, 0);
+        const lineas = productos.map((detalle) => {
+          const bruto = aCentavos(detalle.precio_unitario) * detalle.cantidad;
+          const descuentoLinea = Math.min(aCentavos(detalle.descuento_producto), bruto);
+          return { ...detalle, netoCentavos: bruto - descuentoLinea };
+        });
+        const brutoCentavos = lineas.reduce((sum, linea) => sum + aCentavos(linea.precio_unitario) * linea.cantidad, 0);
+        const descuentoLineasCentavos = lineas.reduce((sum, linea) => sum + aCentavos(linea.precio_unitario) * linea.cantidad - linea.netoCentavos, 0);
+        const descuentoTotalCentavos = aCentavos(quote.descuento || 0);
+        if (descuentoTotalCentavos < descuentoLineasCentavos || descuentoTotalCentavos > brutoCentavos) {
+          throw crearError('El descuento de la cotización no es consistente con sus productos', 409);
+        }
+        const descuentoGlobalCentavos = descuentoTotalCentavos - descuentoLineasCentavos;
+        const baseGlobalCentavos = lineas.reduce((sum, linea) => sum + linea.netoCentavos, 0);
+        if (descuentoGlobalCentavos > 0 && baseGlobalCentavos <= 0) throw crearError('La cotización no tiene importe para aplicar el descuento', 409);
+        let descuentoGlobalAsignado = 0;
+        const lineasNetas = lineas.map((linea, index) => {
+          const descuentoGlobalLinea = index === lineas.length - 1
+            ? descuentoGlobalCentavos - descuentoGlobalAsignado
+            : Math.floor((descuentoGlobalCentavos * linea.netoCentavos) / baseGlobalCentavos);
+          descuentoGlobalAsignado += descuentoGlobalLinea;
+          return { ...linea, subtotalCentavos: linea.netoCentavos - descuentoGlobalLinea };
+        });
+        const subtotalFinal = lineasNetas.reduce((sum, linea) => sum + linea.subtotalCentavos, 0);
         const ivaCentavos = Math.round(subtotalFinal * 0.16);
         const totalCentavos = subtotalFinal + ivaCentavos;
         const esCredito = metodoPago === 'credito';
-        const cajaResult = await client.query(
-          "SELECT id_caja FROM caja WHERE id_usuario = $1 AND estado = 'abierta' ORDER BY fecha_apertura DESC LIMIT 1",
-          [req.user.id_usuario || null]
-        );
-        const idCaja = cajaResult.rows[0]?.id_caja || null;
+        const idCaja = caja.id_caja;
         const saleResult = await client.query(
           `INSERT INTO ventas (id_cliente, id_usuario, id_caja, subtotal, iva, descuento, total, metodo_pago, estado, saldo_pendiente)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
            RETURNING id_venta`,
-          [quote.id_cliente, req.user.id_usuario || null, idCaja, subtotalFinal / 100, ivaCentavos / 100, descuentoCentavos / 100, totalCentavos / 100, metodoPago, esCredito ? 'pendiente' : 'completada', esCredito ? totalCentavos / 100 : 0]
+           [quote.id_cliente, req.user.id_usuario || null, idCaja, subtotalFinal / 100, ivaCentavos / 100, descuentoTotalCentavos / 100, totalCentavos / 100, metodoPago, esCredito ? 'pendiente' : 'completada', esCredito ? totalCentavos / 100 : 0]
+
         );
         const idVenta = saleResult.rows[0].id_venta;
 
-        for (const detalle of productos) {
-          const subtotal = (aCentavos(detalle.precio_unitario) * detalle.cantidad - aCentavos(detalle.descuento_producto)) / 100;
+        for (const detalle of lineasNetas) {
           await client.query(
             `INSERT INTO venta_detalle (id_venta, id_producto, cantidad, precio_unitario, subtotal)
              VALUES ($1, $2, $3, $4, $5)`,
-            [idVenta, detalle.id_producto, detalle.cantidad, detalle.precio_unitario, subtotal]
+            [idVenta, detalle.id_producto, detalle.cantidad, detalle.precio_unitario, detalle.subtotalCentavos / 100]
           );
           const stockResult = await client.query(
             'UPDATE productos SET stock_actual = stock_actual - $1 WHERE id_producto = $2 AND stock_actual >= $1',
@@ -288,10 +322,10 @@ const CotizacionController = {
           "UPDATE cotizaciones SET estado = 'convertida' WHERE id_cotizacion = $1",
           [idCotizacion]
         );
+        await registrarAccionEnCliente(client, req, 'convertir', 'cotizacion', idCotizacion, `Venta ${idVenta}`);
         return { idVenta, idCotizacion, total: totalCentavos / 100 };
       });
 
-      registrarAccion(req, 'convertir', 'cotizacion', resultado.idCotizacion, `Venta ${resultado.idVenta}`);
       res.status(201).json({ message: 'Cotización convertida a venta exitosamente', id_venta: resultado.idVenta, id_cotizacion: resultado.idCotizacion });
     } catch (error) {
       const status = error.status || (error.code === '23503' ? 400 : 500);

@@ -1,7 +1,8 @@
 const connection = require('../config/db_postgres');
 const Venta = require('../models/Venta');
 const VentaDetalle = require('../models/VentaDetalle');
-const { registrarAccion } = require('../utils/audit');
+const Caja = require('../models/Caja');
+const { registrarAccionEnCliente } = require('../utils/audit');
 
 const VentaController = {
   // Obtener todas las ventas (soporta ?page=1&limit=50)
@@ -162,10 +163,10 @@ const VentaController = {
     }
 
     const descuentoNumero = Number(descuento);
-    if (!Number.isFinite(descuentoNumero) || descuentoNumero < 0) {
-      return res.status(400).json({ error: 'El descuento debe ser un número válido' });
-    }
     const descuentoCentavos = Math.round(descuentoNumero * 100);
+    if (!Number.isFinite(descuentoNumero) || descuentoNumero < 0 || Math.abs(descuentoNumero * 100 - descuentoCentavos) > 0.000001) {
+      return res.status(400).json({ error: 'El descuento debe ser un número válido con máximo dos decimales' });
+    }
 
     const productosSolicitados = new Map();
     for (const detalle of detalles) {
@@ -179,6 +180,13 @@ const VentaController = {
 
     try {
       const resultado = await connection.withTransaction(async (client) => {
+        const caja = await Caja.findAbiertaConCliente(client, req.user.id_usuario);
+        if (!caja) {
+          const error = new Error('Debes abrir una caja antes de registrar una venta');
+          error.status = 409;
+          throw error;
+        }
+
         const productos = [];
         const ids = [...productosSolicitados.keys()].sort((a, b) => a - b);
         for (const idProducto of ids) {
@@ -201,11 +209,7 @@ const VentaController = {
           productos.push({ ...producto, cantidad });
         }
 
-        const cajaResult = await client.query(
-          "SELECT id_caja FROM caja WHERE id_usuario = $1 AND estado = 'abierta' ORDER BY fecha_apertura DESC LIMIT 1",
-          [req.user.id_usuario || null]
-        );
-        const idCaja = cajaResult.rows[0] ? cajaResult.rows[0].id_caja : null;
+        const idCaja = caja.id_caja;
         const subtotalCentavos = productos.reduce((sum, producto) => sum + Math.round(Number(producto.precio_venta) * 100) * producto.cantidad, 0);
         const ivaCentavos = Math.round(subtotalCentavos * 0.16);
         const totalCentavos = subtotalCentavos + ivaCentavos - descuentoCentavos;
@@ -252,6 +256,7 @@ const VentaController = {
           }
         }
 
+        await registrarAccionEnCliente(client, req, 'crear', 'venta', idVenta, `Total ${totalCentavos / 100}${esCredito ? ' (crédito)' : ''}`);
         return {
           idVenta,
           total: totalCentavos / 100,
@@ -259,7 +264,6 @@ const VentaController = {
         };
       });
 
-      registrarAccion(req, 'crear', 'venta', resultado.idVenta, `Total ${resultado.total}${esCredito ? ' (crédito)' : ''}`);
       res.status(201).json({
         message: 'Venta creada exitosamente',
         id: resultado.idVenta,
@@ -278,8 +282,32 @@ const VentaController = {
 
     try {
       const total = await connection.withTransaction(async (client) => {
+        const preview = await client.query(
+          'SELECT id_caja, estado FROM ventas WHERE id_venta = $1',
+          [id]
+        );
+        if (preview.rowCount === 0) {
+          const error = new Error('Venta no encontrada');
+          error.status = 404;
+          throw error;
+        }
+        if (!preview.rows[0].id_caja) {
+          const error = new Error('No se puede anular una venta sin caja asociada');
+          error.status = 409;
+          throw error;
+        }
+        const cajaResult = await client.query(
+          'SELECT estado FROM caja WHERE id_caja = $1 FOR UPDATE',
+          [preview.rows[0].id_caja]
+        );
+        if (cajaResult.rowCount === 0 || cajaResult.rows[0].estado !== 'abierta') {
+          const error = new Error('No se puede modificar una venta de una caja cerrada');
+          error.status = 409;
+          throw error;
+        }
+
         const ventaResult = await client.query(
-          'SELECT total, saldo_pendiente, estado FROM ventas WHERE id_venta = $1 FOR UPDATE',
+          'SELECT total, saldo_pendiente, estado, metodo_pago, id_caja FROM ventas WHERE id_venta = $1 FOR UPDATE',
           [id]
         );
         if (ventaResult.rowCount === 0) {
@@ -297,6 +325,20 @@ const VentaController = {
           error.status = 409;
           throw error;
         }
+        if (!['efectivo', 'credito'].includes(ventaResult.rows[0].metodo_pago)) {
+          const error = new Error('La venta requiere una reversión externa antes de anularse');
+          error.status = 409;
+          throw error;
+        }
+        const pagos = await client.query(
+          'SELECT 1 FROM pagos_venta WHERE id_venta = $1 LIMIT 1 FOR UPDATE',
+          [id]
+        );
+        if (pagos.rowCount > 0) {
+          const error = new Error('No se puede anular una venta con pagos o reembolsos registrados');
+          error.status = 409;
+          throw error;
+        }
         const devoluciones = await client.query(
           'SELECT 1 FROM devoluciones WHERE id_venta = $1 LIMIT 1',
           [id]
@@ -308,10 +350,19 @@ const VentaController = {
         }
 
         const detalles = await client.query(
-          'SELECT id_producto, cantidad FROM venta_detalle WHERE id_venta = $1',
+          'SELECT id_producto, cantidad FROM venta_detalle WHERE id_venta = $1 ORDER BY id_producto',
           [id]
         );
         for (const detalle of detalles.rows) {
+          const productResult = await client.query(
+            'SELECT id_producto FROM productos WHERE id_producto = $1 FOR UPDATE',
+            [detalle.id_producto]
+          );
+          if (productResult.rowCount !== 1) {
+            const error = new Error('No se pudo bloquear el producto de la venta');
+            error.status = 409;
+            throw error;
+          }
           const stockResult = await client.query(
             'UPDATE productos SET stock_actual = stock_actual + $1 WHERE id_producto = $2',
             [detalle.cantidad, detalle.id_producto]
@@ -323,9 +374,10 @@ const VentaController = {
           }
         }
         await client.query("UPDATE ventas SET estado = 'anulada' WHERE id_venta = $1", [id]);
-        return Number(ventaResult.rows[0].total);
+        const totalVenta = Number(ventaResult.rows[0].total);
+        await registrarAccionEnCliente(client, req, 'anular', 'venta', id, `Total ${totalVenta}`);
+        return totalVenta;
       });
-      registrarAccion(req, 'anular', 'venta', id, `Total ${total}`);
       res.json({ message: 'Venta anulada exitosamente' });
     } catch (error) {
       const status = error.status || 500;
@@ -349,12 +401,11 @@ const VentaController = {
     if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID de venta inválido' });
     if (!Number.isFinite(monto) || monto <= 0) return res.status(400).json({ error: 'El monto del abono debe ser mayor a 0' });
 
-    Venta.abonar(id, monto, req.user.id_usuario || null, (err, resultado) => {
+    Venta.abonar(id, monto, req.user.id_usuario || null, req, (err, resultado) => {
       if (err) {
-        const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'NO_BALANCE' ? 400 : 500;
+        const status = err.status || (err.code === 'NOT_FOUND' ? 404 : err.code === 'NO_BALANCE' ? 400 : 500);
         return res.status(status).json({ error: status === 500 ? 'Error al registrar el abono' : err.message });
       }
-      registrarAccion(req, 'abonar', 'venta', id, `Abono de ${resultado.monto_aplicado}. Saldo restante: ${resultado.saldo_nuevo}`);
       res.json({
         message: 'Abono registrado exitosamente',
         saldo_anterior: resultado.saldo_anterior,

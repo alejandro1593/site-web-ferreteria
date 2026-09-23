@@ -110,6 +110,11 @@ describe('Autenticación', () => {
     const response = await request(app).post('/api/auth/login').send({});
     expect(response.status).toBe(400);
   });
+
+  test('rechaza esquemas de autorización distintos de Bearer', async () => {
+    const response = await request(app).get('/api/productos').set('Authorization', `Basic ${tokenAdmin}`);
+    expect(response.status).toBe(401);
+  });
 });
 
 describe('Registro y revocación', () => {
@@ -120,13 +125,18 @@ describe('Registro y revocación', () => {
 
   test('registro con rol inválido degrada a vendedor', async () => {
     const username = `test_rol_${RUN_ID}`;
-    const response = await request(app).post('/api/auth/register').set('Authorization', `Bearer ${tokenAdmin}`).send({ username, password: 'test123456', nombre: 'Test Rol', rol: 'SUPERUSUARIO' });
+    const response = await request(app).post('/api/auth/register').set('Authorization', `Bearer ${tokenAdmin}`).send({ username, password: 'TestRol2026', nombre: 'Test Rol', rol: 'SUPERUSUARIO' });
     expect(response.status).toBe(201);
     const connection = await client();
     const result = await connection.query('SELECT id_usuario, rol FROM usuarios WHERE username = $1', [username]);
     await connection.end();
     createdUserIds.push(result.rows[0].id_usuario);
     expect(result.rows[0].rol).toBe('vendedor');
+  });
+
+  test('registro con contraseña débil es rechazado', async () => {
+    const response = await request(app).post('/api/auth/register').set('Authorization', `Bearer ${tokenAdmin}`).send({ username: `test_debil_${RUN_ID}`, password: 'corta', nombre: 'Test Débil' });
+    expect(response.status).toBe(400);
   });
 
   test('un token deja de funcionar al desactivar al usuario', async () => {
@@ -180,6 +190,13 @@ describe('Control de acceso por roles', () => {
 });
 
 describe('Módulos', () => {
+  test('health endpoint comprueba la base de datos', async () => {
+    const response = await request(app).get('/health');
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('ok');
+    expect(response.body.database).toBe('ok');
+  });
+
   test('compras requiere token y permite consulta con admin', async () => {
     const sinToken = await request(app).get('/api/compras');
     expect(sinToken.status).toBe(401);
@@ -213,5 +230,18 @@ describe('Módulos', () => {
   test('ajuste de inventario valida campos', async () => {
     const response = await request(app).post('/api/ajustes').set('Authorization', `Bearer ${tokenAdmin}`).send({});
     expect(response.status).toBe(400);
+  });
+
+  test('no permite anular una venta sin caja asociada', async () => {
+    const response = await request(app).delete(`/api/ventas/${ventaTestId}`).set('Authorization', `Bearer ${tokenAdmin}`);
+    expect(response.status).toBe(409);
+    expect(response.body.error).toMatch(/caja/i);
+  });
+
+  test('logout revoca el token actual', async () => {
+    const response = await request(app).post('/api/auth/logout').set('Authorization', `Bearer ${tokenAdmin}`);
+    expect(response.status).toBe(200);
+    const verify = await request(app).get('/api/auth/verify').set('Authorization', `Bearer ${tokenAdmin}`);
+    expect(verify.status).toBe(401);
   });
 });

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Usuario = require('../models/Usuario');
 const connection = require('../config/db_postgres');
+const { authConfig, isValidPassword } = require('../config/auth_config');
 const { registrarAccion } = require('../utils/audit');
 
 const AuthController = {
@@ -49,8 +50,13 @@ const AuthController = {
           rol: usuario.rol,
           token_version: Number(usuario.token_version || 0)
         },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+        authConfig.secret,
+        {
+          expiresIn: authConfig.expiresIn,
+          algorithm: authConfig.algorithm,
+          issuer: authConfig.issuer,
+          audience: authConfig.audience
+        }
       );
 
       // Preparar datos de respuesta (sin password)
@@ -83,9 +89,8 @@ const AuthController = {
       return res.status(400).json({ error: 'Username, password y nombre son requeridos' });
     }
 
-    // Validar longitud de contraseña
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ error: 'La contraseña debe tener entre 10 y 128 caracteres, incluir letras y números' });
     }
 
     // Validar que el rol sea uno de los permitidos
@@ -135,7 +140,11 @@ const AuthController = {
 
   // Logout (en JWT se hace del lado del cliente eliminando el token)
   logout: (req, res) => {
-    res.json({ message: 'Logout exitoso' });
+    Usuario.revokeTokens(req.user.id_usuario, (error) => {
+      if (error) return res.status(500).json({ error: 'No se pudo cerrar la sesión' });
+      registrarAccion(req, 'logout', 'usuario', req.user.id_usuario);
+      res.json({ message: 'Logout exitoso' });
+    });
   },
 
   // Cambiar contraseña
@@ -147,8 +156,8 @@ const AuthController = {
       return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
     }
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+    if (!passwordValida(newPassword)) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener entre 10 y 128 caracteres, incluir letras y números' });
     }
 
     // Obtener usuario actual

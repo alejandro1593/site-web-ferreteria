@@ -1,22 +1,8 @@
 const connection = require('../config/db_postgres');
 
-/**
- * Registra una acción en el log de auditoría.
- * No bloquea la petición: si falla, solo lo reporta por consola.
- *
- * @param {Object} req  - Request de Express (usa req.user e ip)
- * @param {string} accion - 'crear' | 'actualizar' | 'eliminar' | 'abonar' ...
- * @param {string} entidad - 'usuario' | 'producto' | 'venta' | 'compra' ...
- * @param {number|null} entidadId
- * @param {string|null} detalles
- */
-function registrarAccion(req, accion, entidad, entidadId = null, detalles = null) {
+function valoresAuditoria(req, accion, entidad, entidadId, detalles) {
   const usuario = req.user || {};
-  const sql = `
-    INSERT INTO log_acciones (id_usuario, username, accion, entidad, entidad_id, detalles, ip)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
-  const values = [
+  return [
     usuario.id_usuario || null,
     usuario.username || null,
     accion,
@@ -25,12 +11,20 @@ function registrarAccion(req, accion, entidad, entidadId = null, detalles = null
     detalles ? String(detalles).substring(0, 500) : null,
     req.ip || null
   ];
+}
 
-  connection.query(sql, values, (err) => {
-    if (err) {
-      console.error('Error al registrar auditoría:', err.message);
-    }
+function registrarAccionEnCliente(client, req, accion, entidad, entidadId = null, detalles = null) {
+  return client.query(
+    `INSERT INTO log_acciones (id_usuario, username, accion, entidad, entidad_id, detalles, ip)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    valoresAuditoria(req, accion, entidad, entidadId, detalles)
+  );
+}
+
+function registrarAccion(req, accion, entidad, entidadId = null, detalles = null) {
+  registrarAccionEnCliente(connection, req, accion, entidad, entidadId, detalles).catch(error => {
+    console.error('Error al registrar auditoría:', error.message);
   });
 }
 
-module.exports = { registrarAccion };
+module.exports = { registrarAccion, registrarAccionEnCliente };

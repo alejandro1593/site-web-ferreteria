@@ -1,4 +1,6 @@
 const connection = require('../config/db_postgres');
+const Caja = require('./Caja');
+const { registrarAccionEnCliente } = require('../utils/audit');
 
 const Venta = {
   // Obtener todas las ventas con cliente y total de items
@@ -213,10 +215,18 @@ const Venta = {
   },
 
   // Registrar abono a una venta a crédito
-  abonar: (id, monto, idUsuario, callback) => {
+  abonar: (id, monto, idUsuario, req, callback) => {
     connection.withTransaction(async (client) => {
+      const caja = await Caja.findAbiertaConCliente(client, idUsuario);
+      if (!caja) {
+        const error = new Error('Debes abrir una caja antes de registrar un abono');
+        error.code = 'CAJA_REQUIRED';
+        error.status = 409;
+        throw error;
+      }
+
       const result = await client.query(
-        'SELECT total, saldo_pendiente FROM ventas WHERE id_venta = $1 FOR UPDATE',
+        'SELECT total, saldo_pendiente, estado, metodo_pago FROM ventas WHERE id_venta = $1 FOR UPDATE',
         [id]
       );
       if (result.rows.length === 0) {
@@ -226,8 +236,34 @@ const Venta = {
       }
 
       const venta = result.rows[0];
+      if (venta.estado === 'anulada') {
+        const error = new Error('La venta está anulada');
+        error.code = 'SALE_ANULLED';
+        error.status = 409;
+        throw error;
+      }
+      if (venta.metodo_pago !== 'credito') {
+        const error = new Error('Solo las ventas a crédito pueden recibir abonos');
+        error.code = 'NOT_CREDIT';
+        error.status = 409;
+        throw error;
+      }
       const saldoAnterior = Number(venta.saldo_pendiente);
-      const montoAplicado = Math.min(saldoAnterior, Number(monto));
+      const montoSolicitado = Number(monto);
+      const montoCentavos = Math.round(montoSolicitado * 100);
+      if (!Number.isFinite(montoSolicitado) || montoCentavos <= 0 || Math.abs(montoSolicitado * 100 - montoCentavos) > 0.000001) {
+        const error = new Error('El monto del abono debe ser un valor positivo con máximo dos decimales');
+        error.code = 'INVALID_AMOUNT';
+        error.status = 400;
+        throw error;
+      }
+      if (montoCentavos > Math.round(saldoAnterior * 100)) {
+        const error = new Error('El abono no puede superar el saldo pendiente');
+        error.code = 'AMOUNT_EXCEEDS_BALANCE';
+        error.status = 409;
+        throw error;
+      }
+      const montoAplicado = montoCentavos / 100;
       if (montoAplicado <= 0) {
         const error = new Error('La venta no tiene saldo pendiente');
         error.code = 'NO_BALANCE';
@@ -235,12 +271,6 @@ const Venta = {
       }
       const nuevoSaldo = Math.max(saldoAnterior - montoAplicado, 0);
       const nuevoEstado = nuevoSaldo === 0 ? 'completada' : 'pendiente';
-      const cajaResult = idUsuario
-        ? await client.query(
-          "SELECT id_caja FROM caja WHERE id_usuario = $1 AND estado = 'abierta' ORDER BY fecha_apertura DESC LIMIT 1",
-          [idUsuario]
-        )
-        : { rows: [] };
 
       await client.query(
         'UPDATE ventas SET saldo_pendiente = $1, estado = $2 WHERE id_venta = $3',
@@ -249,8 +279,9 @@ const Venta = {
       await client.query(
         `INSERT INTO pagos_venta (id_venta, id_caja, id_usuario, tipo, monto, metodo)
          VALUES ($1, $2, $3, 'abono', $4, 'efectivo')`,
-        [id, cajaResult.rows[0]?.id_caja || null, idUsuario || null, montoAplicado]
+        [id, caja.id_caja, idUsuario || null, montoAplicado]
       );
+      await registrarAccionEnCliente(client, req, 'abonar', 'venta', id, `Abono de ${montoAplicado}. Saldo restante: ${nuevoSaldo}`);
 
       return { saldo_anterior: saldoAnterior, saldo_nuevo: nuevoSaldo, monto_aplicado: montoAplicado };
     }).then((result) => callback(null, result)).catch(callback);

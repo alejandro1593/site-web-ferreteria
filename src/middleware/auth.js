@@ -1,14 +1,20 @@
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
+const { authConfig } = require('../config/auth_config');
 
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: 'No se proporcionó token de autenticación' });
-    const token = authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Formato de token inválido' });
+    const match = authHeader.match(/^Bearer\s+(\S+)$/i);
+    if (!match) return res.status(401).json({ error: 'Formato de token inválido' });
+    const token = match[1];
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, authConfig.secret, {
+      algorithms: [authConfig.algorithm],
+      issuer: authConfig.issuer,
+      audience: authConfig.audience
+    });
     const idUsuario = Number(decoded.id_usuario || decoded.id);
     if (!Number.isInteger(idUsuario) || idUsuario <= 0) return res.status(401).json({ error: 'Token inválido' });
 

@@ -156,22 +156,29 @@ function promise() {
 }
 
 async function withTransaction(callback) {
-  const client = await pool.connect();
-  try {
-    return await transactionStorage.run({ client }, async () => {
-      await client.query('BEGIN');
-      try {
-        const result = await callback(client);
-        await client.query('COMMIT');
-        return result;
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      }
-    });
-  } finally {
-    client.release();
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const client = await pool.connect();
+    try {
+      return await transactionStorage.run({ client }, async () => {
+        await client.query('BEGIN');
+        try {
+          const result = await callback(client);
+          await client.query('COMMIT');
+          return result;
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        }
+      });
+    } catch (error) {
+      if (!['40P01', '40001'].includes(error.code) || attempt === maxAttempts) throw error;
+      await new Promise(resolve => setTimeout(resolve, attempt * 25));
+    } finally {
+      client.release();
+    }
   }
+  throw new Error('No se pudo completar la transacción');
 }
 
 function beginTransaction(callback) {

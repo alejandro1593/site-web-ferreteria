@@ -1,5 +1,53 @@
 const connection = require('../config/db_postgres');
 
+const resumenSql = `
+  SELECT
+    COALESCE((
+      SELECT SUM(v.total)
+      FROM ventas v
+      WHERE v.id_caja = $1
+        AND v.estado = 'completada'
+        AND v.metodo_pago = 'efectivo'
+    ), 0) AS total_ventas,
+    COALESCE((
+      SELECT SUM(p.monto)
+      FROM pagos_venta p
+      WHERE p.id_caja = $2
+        AND p.tipo = 'abono'
+        AND p.metodo = 'efectivo'
+    ), 0) AS total_abonos,
+    COALESCE((
+      SELECT SUM(p.monto)
+      FROM pagos_venta p
+      WHERE p.id_caja = $3
+        AND p.tipo = 'reembolso'
+        AND p.metodo = 'efectivo'
+    ), 0) + COALESCE((
+      SELECT SUM(d.monto_reembolso)
+      FROM devoluciones d
+      JOIN ventas v ON v.id_venta = d.id_venta
+      WHERE v.id_caja = $4
+        AND d.estado = 'completada'
+        AND d.metodo_reembolso = 'efectivo'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM pagos_venta p
+           WHERE p.tipo = 'reembolso'
+             AND (
+               p.id_devolucion = d.id_devolucion
+               OR (p.id_devolucion IS NULL AND p.id_venta = d.id_venta)
+             )
+         )
+
+    ), 0) AS total_devoluciones,
+    COALESCE((
+      SELECT COUNT(*)
+      FROM ventas v
+      WHERE v.id_caja = $5
+        AND v.estado = 'completada'
+    ), 0)::integer AS total_ventas_count
+`;
+
 const Caja = {
   findAll: (callback) => {
     const sql = `
@@ -31,10 +79,22 @@ const Caja = {
     connection.query(sql, [idUsuario], callback);
   },
 
+  findAbiertaConCliente: async (client, idUsuario) => {
+    const result = await client.query(
+      `SELECT * FROM caja
+       WHERE id_usuario = $1 AND estado = 'abierta'
+       ORDER BY fecha_apertura DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [idUsuario]
+    );
+    return result.rows[0] || null;
+  },
+
   create: (data, callback) => {
     const sql = `
-      INSERT INTO caja (id_usuario, monto_apertura, estado, observaciones)
-      VALUES (?, ?, 'abierta', ?) RETURNING id_caja
+      INSERT INTO caja (id_usuario, fecha_apertura, monto_apertura, estado, observaciones)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'abierta', ?) RETURNING id_caja
     `;
     connection.query(sql, [data.id_usuario, data.monto_apertura || 0, data.observaciones || ''], callback);
   },
@@ -67,49 +127,35 @@ const Caja = {
 
   getDevolucionesCaja: (idCaja, callback) => {
     const sql = `
-      SELECT d.*, p.nombre as producto_nombre
+      SELECT d.*, pr.nombre as producto_nombre
       FROM devoluciones d
-      JOIN productos p ON d.id_producto = p.id_producto
+      JOIN productos pr ON d.id_producto = pr.id_producto
       JOIN ventas v ON d.id_venta = v.id_venta
-      WHERE v.id_caja = ?
+      LEFT JOIN LATERAL (
+        SELECT p.id_caja
+        FROM pagos_venta p
+        WHERE p.tipo = 'reembolso'
+          AND (
+            p.id_devolucion = d.id_devolucion
+            OR (p.id_devolucion IS NULL AND p.id_venta = d.id_venta)
+          )
+        ORDER BY (p.id_devolucion IS NOT NULL) DESC, p.id_pago
+        LIMIT 1
+      ) pg ON TRUE
+      WHERE pg.id_caja = ?
+         OR (pg.id_caja IS NULL AND v.id_caja = ?)
       ORDER BY d.fecha DESC
     `;
-    connection.query(sql, [idCaja], callback);
+    connection.query(sql, [idCaja, idCaja], callback);
+  },
+
+  getResumenCajaConCliente: async (client, idCaja) => {
+    const result = await client.query(resumenSql, [idCaja, idCaja, idCaja, idCaja, idCaja]);
+    return result.rows[0] || {};
   },
 
   getResumenCaja: (idCaja, callback) => {
-    const sql = `
-      SELECT
-        COALESCE((
-          SELECT SUM(v.total)
-          FROM ventas v
-          WHERE v.id_caja = ?
-            AND v.estado = 'completada'
-            AND v.metodo_pago = 'efectivo'
-        ), 0) as total_ventas,
-        COALESCE((
-          SELECT SUM(p.monto)
-          FROM pagos_venta p
-          WHERE p.id_caja = ?
-            AND p.tipo = 'abono'
-            AND p.metodo = 'efectivo'
-        ), 0) as total_abonos,
-        COALESCE((
-          SELECT SUM(d.monto_reembolso)
-          FROM devoluciones d
-          JOIN ventas v ON d.id_venta = v.id_venta
-          WHERE v.id_caja = ?
-            AND d.estado = 'completada'
-            AND d.metodo_reembolso = 'efectivo'
-        ), 0) as total_devoluciones,
-        COALESCE((
-          SELECT COUNT(*)
-          FROM ventas v
-          WHERE v.id_caja = ?
-            AND v.estado = 'completada'
-        ), 0)::integer as total_ventas_count
-    `;
-    connection.query(sql, [idCaja, idCaja, idCaja, idCaja], callback);
+    connection.query(resumenSql, [idCaja, idCaja, idCaja, idCaja, idCaja], callback);
   }
 };
 

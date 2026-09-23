@@ -2,7 +2,7 @@ const connection = require('../config/db_postgres');
 const bcrypt = require('bcryptjs');
 const Caja = require('../models/Caja');
 const Usuario = require('../models/Usuario');
-const { registrarAccion } = require('../utils/audit');
+const { registrarAccionEnCliente } = require('../utils/audit');
 
 function usuarioActual(req) {
   return Number(req.user && req.user.id_usuario);
@@ -11,11 +11,19 @@ function usuarioActual(req) {
 function montoValido(value, required = true) {
   if ((value === undefined || value === null || value === '') && !required) return 0;
   const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : null;
+  const centimos = number * 100;
+  if (!Number.isFinite(number) || number < 0 || Math.abs(centimos - Math.round(centimos)) > 0.000001) return null;
+  return number;
 }
 
 function puedeAccederCaja(req, caja) {
   return caja && (['admin', 'gerente', 'supervisor'].includes(req.user.rol) || Number(caja.id_usuario) === Number(req.user.id_usuario));
+}
+
+function crearError(message, status) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
 }
 
 const CajaController = {
@@ -57,15 +65,25 @@ const CajaController = {
       const validPassword = await bcrypt.compare(password, usuario.password);
       if (!validPassword) return res.status(401).json({ error: 'Password incorrecto' });
 
-      const abierta = await new Promise((resolve, reject) => Caja.findAbierta(idUsuario, (err, rows) => err ? reject(err) : resolve(rows[0])));
-      if (abierta) return res.status(409).json({ error: 'Ya existe una caja abierta para este usuario' });
+      const idCaja = await connection.withTransaction(async (client) => {
+        const abierta = await Caja.findAbiertaConCliente(client, idUsuario);
+        if (abierta) throw crearError('Ya existe una caja abierta para este usuario', 409);
+        const result = await client.query(
+          `INSERT INTO caja (id_usuario, fecha_apertura, monto_apertura, estado, observaciones)
+           VALUES ($1, CURRENT_TIMESTAMP, $2, 'abierta', $3)
+           RETURNING id_caja`,
+          [idUsuario, montoApertura, req.body?.observaciones || '']
+         );
+         const idCaja = result.rows[0].id_caja;
+         await registrarAccionEnCliente(client, req, 'abrir', 'caja', idCaja, `Monto ${montoApertura}`);
+         return idCaja;
+       });
+       res.status(201).json({ message: 'Caja abierta exitosamente', id: idCaja });
 
-      const idCaja = await new Promise((resolve, reject) => Caja.create({ id_usuario: idUsuario, monto_apertura: montoApertura, observaciones: req.body?.observaciones || '' }, (err, rows) => err ? reject(err) : resolve(rows.insertId)));
-      registrarAccion(req, 'abrir', 'caja', idCaja, `Monto ${montoApertura}`);
-      res.status(201).json({ message: 'Caja abierta exitosamente', id: idCaja });
     } catch (error) {
       if (error.code === '23505' || error.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ya existe una caja abierta para este usuario' });
-      res.status(500).json({ error: 'Error al abrir caja' });
+      const status = error.status || 500;
+      res.status(status).json({ error: status === 500 ? 'Error al abrir caja' : error.message });
     }
   },
 
@@ -81,16 +99,37 @@ const CajaController = {
       const validPassword = await bcrypt.compare(password, usuario.password);
       if (!validPassword) return res.status(401).json({ error: 'Password incorrecto' });
 
-      const caja = await new Promise((resolve, reject) => Caja.findAbierta(idUsuario, (err, rows) => err ? reject(err) : resolve(rows[0])));
-      if (!caja) return res.status(400).json({ error: 'No hay caja abierta para este usuario' });
-      const resumen = await new Promise((resolve, reject) => Caja.getResumenCaja(caja.id_caja, (err, rows) => err ? reject(err) : resolve(rows[0] || {})));
-      const montoEsperado = Number(caja.monto_apertura) + Number(resumen.total_ventas || 0) + Number(resumen.total_abonos || 0) - Number(resumen.total_devoluciones || 0);
-      const result = await new Promise((resolve, reject) => Caja.updateCierre(caja.id_caja, { monto_cierre: montoCierre, monto_esperado: montoEsperado, observaciones: req.body?.observaciones || '' }, (err, rows) => err ? reject(err) : resolve(rows)));
-      if (result.affectedRows === 0) return res.status(409).json({ error: 'La caja ya fue cerrada' });
-      registrarAccion(req, 'cerrar', 'caja', caja.id_caja, `Diferencia ${montoCierre - montoEsperado}`);
-      res.json({ message: 'Caja cerrada exitosamente', monto_cierre: montoCierre, monto_esperado: montoEsperado, diferencia: Number((montoCierre - montoEsperado).toFixed(2)) });
+      const resultado = await connection.withTransaction(async (client) => {
+        const caja = await Caja.findAbiertaConCliente(client, idUsuario);
+        if (!caja) throw crearError('No hay caja abierta para este usuario', 400);
+        const resumen = await Caja.getResumenCajaConCliente(client, caja.id_caja);
+        const montoEsperado = Number(caja.monto_apertura) + Number(resumen.total_ventas || 0) + Number(resumen.total_abonos || 0) - Number(resumen.total_devoluciones || 0);
+        const cierre = await client.query(
+          `UPDATE caja
+           SET fecha_cierre = CURRENT_TIMESTAMP,
+               monto_cierre = $1,
+               monto_esperado = $2,
+               diferencia = $1::numeric - $2::numeric,
+               estado = 'cerrada',
+               observaciones = $3
+           WHERE id_caja = $4 AND estado = 'abierta'
+           RETURNING id_caja`,
+          [montoCierre, montoEsperado, req.body?.observaciones || '', caja.id_caja]
+        );
+        if (cierre.rowCount !== 1) throw crearError('La caja ya fue cerrada', 409);
+        await registrarAccionEnCliente(client, req, 'cerrar', 'caja', caja.id_caja, `Diferencia ${montoCierre - montoEsperado}`);
+        return { idCaja: caja.id_caja, montoEsperado };
+      });
+      res.json({
+        message: 'Caja cerrada exitosamente',
+        monto_cierre: montoCierre,
+        monto_esperado: resultado.montoEsperado,
+        diferencia: Number((montoCierre - resultado.montoEsperado).toFixed(2))
+      });
     } catch (error) {
-      res.status(500).json({ error: 'Error al cerrar caja' });
+      const status = error.status || 500;
+      if (status === 500) console.error('Error al cerrar caja:', error);
+      res.status(status).json({ error: status === 500 ? 'Error al cerrar caja' : error.message });
     }
   },
 

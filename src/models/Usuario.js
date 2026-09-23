@@ -71,6 +71,11 @@ const Usuario = {
     connection.query(sql, [password, id], callback);
   },
 
+  revokeTokens: (id, callback) => {
+    const sql = 'UPDATE usuarios SET token_version = token_version + 1 WHERE id_usuario = ?';
+    connection.query(sql, [id], callback);
+  },
+
   // Eliminar usuario
   delete: (id, callback) => {
     const sql = 'DELETE FROM usuarios WHERE id_usuario = ?';

@@ -70,6 +70,8 @@ PORT=3000
 # JWT Configuration
 JWT_SECRET=cadena_aleatoria_larga_y_secreta
 JWT_EXPIRES_IN=8h
+JWT_ISSUER=ferreteria-api
+JWT_AUDIENCE=ferreteria-web
 ```
 
 > 💡 Para generar un `JWT_SECRET` seguro:
@@ -88,7 +90,9 @@ JWT_EXPIRES_IN=8h
 | `npm run import:mysql:dry-run -- <archivo.sql>` | Valida el dump sin escribir en PostgreSQL |
 | `npm test` | Ejecuta los tests contra `TEST_DATABASE_URL` |
 | `npm run lint` | Verifica la sintaxis de todos los archivos JavaScript |
-| `npm run backup` | Genera un respaldo local de PostgreSQL |
+| `npm run backup` | Genera un respaldo PostgreSQL local; usa `pg_dump` cuando está disponible |
+| `npm run restore:postgres -- --file <respaldo>` | Restaura un respaldo únicamente en una base de prueba, con `RESTORE_ALLOW=true` |
+| `npm run check:integrity` | Revisa asociaciones de ventas, cajas, stock y cuadres financieros |
 
 ## 📁 Estructura del proyecto
 
@@ -96,6 +100,7 @@ JWT_EXPIRES_IN=8h
 ├── src/
 │   ├── app.js                  # Servidor Express (helmet, rate-limit, rutas)
 │   ├── config/
+│   │   ├── auth_config.js      # Configuración y validación JWT
 │   │   └── db_postgres.js      # Pool PostgreSQL y transacciones
 │   ├── models/                 # Consultas SQL (Producto, Venta, Compra, Ajuste...)
 │   ├── controllers/            # Lógica de negocio por módulo
@@ -110,10 +115,12 @@ JWT_EXPIRES_IN=8h
 │   ├── import_mysql_dump.js    # Importador controlado MariaDB/MySQL → PostgreSQL
 │   ├── migracion_v2.js         # Alias compatible de la migración PostgreSQL
 │   ├── backup_db.js            # Respaldo local de PostgreSQL
+│   ├── check_integrity.js      # Auditoría de integridad de datos
 │   ├── rotar_passwords.js      # Rotación masiva de claves (gitignored)
 │   └── auditar_accesos.js      # Auditoría de cuentas (gitignored)
 └── tests/
-    └── auth.test.js            # Tests de autenticación, roles y seguridad
+    ├── auth.test.js            # Tests de autenticación, roles y seguridad
+    └── caja.test.js           # Tests de caja, ventas y cierre
 ```
 
 ## 🔐 Roles y permisos
@@ -132,14 +139,16 @@ admin autenticado puede crear cuentas).
 ## 🛡️ Seguridad implementada
 
 - Contraseñas hasheadas con **bcryptjs**
-- Tokens **JWT** firmados y revocados mediante `token_version`
+- Tokens **JWT** firmados con algoritmo, issuer y audience validados; revocados mediante `token_version`
+- Contraseñas de al menos 10 caracteres con letras y números
 - **Rate limiting**: login máx. 10 intentos/15 min · API 300 req/min
-- **Helmet** y CSPbasic para cabeceras HTTP seguras
+- **Helmet** y CSP para cabeceras HTTP seguras
 - Sanitización anti-XSS en las vistas
 - Control de roles por endpoint (no confía en el cliente)
-- Transacciones y bloqueos de inventario para ventas, compras, caja y devoluciones
-- Auditoría de operaciones sensibles (`log_acciones`)
-- Tests automatizados de escalada de privilegios y acceso
+- Transacciones y bloqueos de inventario/caja para ventas, compras, abonos y devoluciones
+- Auditoría transaccional de operaciones sensibles (`log_acciones`)
+- Health check en `GET /health` y verificación de integridad financiera
+- Tests automatizados de escalada de privilegios, caja y acceso
 
 ## 🔑 Contraseñas
 
@@ -156,8 +165,20 @@ node scripts/rotar_passwords.js   # genera claves fuertes nuevas para todos
 npm run backup
 ```
 
-Genera un respaldo local usando la configuración `DATABASE_URL`. Los respaldos
-contienen datos personales y deben guardarse cifrados y fuera del repositorio.
+Genera un respaldo local usando la configuración `DATABASE_URL`; cuando `pg_dump`
+está disponible crea un dump PostgreSQL restoreable y, si no, conserva un snapshot
+JSON. Para restaurarlo se requiere una base cuyo nombre incluya `test`, `restore` o
+`staging` y confirmación explícita:
+
+```bash
+RESTORE_ALLOW=true RESTORE_TARGET_DATABASE=neondb_test npm run restore:postgres -- --file backups/backup_<timestamp>.dump
+```
+
+El restaurador exige una base vacía, un bloqueo de destino y verifica el
+checksum SHA-256 cuando existe el archivo `.sha256` acompañante.
+
+Los respaldos contienen datos personales y deben guardarse cifrados y fuera del
+repositorio. Nunca se debe usar `RESTORE_ALLOW=true` contra producción.
 
 ## 🧪 Tests
 
