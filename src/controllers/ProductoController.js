@@ -1,14 +1,73 @@
+const fs = require('fs');
 const Producto = require('../models/Producto');
+const Ajuste = require('../models/Ajuste');
 const { registrarAccion } = require('../utils/audit');
+
+function archivoValido(file) {
+  return new Promise((resolve, reject) => {
+    fs.open(file.path, 'r', (openError, fd) => {
+      if (openError) return reject(openError);
+      const buffer = Buffer.alloc(12);
+      fs.read(fd, buffer, 0, buffer.length, 0, (readError, bytesRead) => {
+        fs.close(fd, () => {});
+        if (readError) return reject(readError);
+        const data = buffer.subarray(0, bytesRead);
+        const valid = (file.mimetype === 'image/jpeg' || file.mimetype === 'image/jpg') && data[0] === 0xff && data[1] === 0xd8
+          || file.mimetype === 'image/png' && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+          || (file.mimetype === 'image/gif' && ['GIF87a', 'GIF89a'].includes(data.toString('ascii', 0, 6)))
+          || file.mimetype === 'image/webp' && data.toString('ascii', 0, 4) === 'RIFF' && data.toString('ascii', 8, 12) === 'WEBP';
+        if (valid) return resolve(true);
+        reject(new Error('El contenido del archivo no coincide con una imagen válida'));
+      });
+    });
+  });
+}
+
+function eliminarArchivo(file) {
+  if (file && file.path) fs.unlink(file.path, () => {});
+}
+
+function productoValido(data) {
+  const nombre = String(data.nombre || '').trim();
+  const precioVenta = Number(data.precio_venta);
+  const precioCompra = data.precio_compra === undefined || data.precio_compra === null || data.precio_compra === '' ? null : Number(data.precio_compra);
+  const stockActual = data.stock_actual === undefined || data.stock_actual === null || data.stock_actual === '' ? 0 : Number(data.stock_actual);
+  const stockMinimo = data.stock_minimo === undefined || data.stock_minimo === null || data.stock_minimo === '' ? 0 : Number(data.stock_minimo);
+  const idCategoria = data.id_categoria ? Number(data.id_categoria) : null;
+  const idProveedor = data.id_proveedor ? Number(data.id_proveedor) : null;
+  if (!nombre || !Number.isFinite(precioVenta) || precioVenta <= 0 || (precioCompra !== null && (!Number.isFinite(precioCompra) || precioCompra < 0)) || !Number.isInteger(stockActual) || stockActual < 0 || !Number.isInteger(stockMinimo) || stockMinimo < 0 || (idCategoria !== null && (!Number.isInteger(idCategoria) || idCategoria <= 0)) || (idProveedor !== null && (!Number.isInteger(idProveedor) || idProveedor <= 0))) {
+    const error = new Error('Los datos del producto no son válidos');
+    error.status = 400;
+    throw error;
+  }
+  return {
+    nombre,
+    descripcion: data.descripcion ? String(data.descripcion).slice(0, 2000) : null,
+    codigo: data.codigo ? String(data.codigo).trim().slice(0, 50) : null,
+    precio_compra: precioCompra,
+    precio_venta: precioVenta,
+    stock_actual: stockActual,
+    stock_minimo: stockMinimo,
+    id_categoria: idCategoria,
+    id_proveedor: idProveedor,
+    imagen: data.imagen ? String(data.imagen).slice(0, 255) : null,
+    activo: data.activo === undefined ? true : data.activo === true || data.activo === 'true' || data.activo === 1
+  };
+}
 
 const ProductoController = {
    // Obtener todos los productos (soporta ?page=1&limit=50)
    getAll: (req, res) => {
      const { page, limit } = req.query;
      const options = {};
-     if (page && limit) {
-       options.limit = Math.min(Number(limit), 200);
-       options.offset = (Math.max(Number(page), 1) - 1) * options.limit;
+     if (page !== undefined || limit !== undefined) {
+       const pageNumber = Number(page);
+       const limitNumber = Number(limit);
+       if (!Number.isInteger(pageNumber) || pageNumber < 1 || !Number.isInteger(limitNumber) || limitNumber < 1 || limitNumber > 200) {
+         return res.status(400).json({ error: 'Parámetros de paginación inválidos' });
+       }
+       options.limit = limitNumber;
+       options.offset = (pageNumber - 1) * limitNumber;
      }
      Producto.findAll(options, (err, results) => {
        if (err) {
@@ -72,107 +131,39 @@ const ProductoController = {
      });
    },
 
-    // Crear nuevo producto
      create: (req, res) => {
+       let data;
        try {
-         console.log('🔍 === INICIO CREATE ===');
-         console.log('🔍 req.body completo:', JSON.stringify(req.body, null, 2));
-         console.log('🔍 req.body tipo:', typeof req.body);
-         console.log('🔍 req.body está vacío:', Object.keys(req.body || {}).length === 0);
-         console.log('🔍 req.headers:', req.headers['content-type']);
-         
-         const { nombre, descripcion, codigo, precio_compra, precio_venta, stock_actual, stock_minimo, id_categoria, id_proveedor, imagen, activo } = req.body || {};
-
-         console.log('📦 Creando producto:', { nombre, descripcion, codigo, precio_compra, precio_venta, stock_actual, stock_minimo, id_categoria, id_proveedor, imagen, activo });
-
-        if (!nombre || !precio_venta) {
-          console.log('❌ Validación fallida: nombre o precio_venta faltante');
-          return res.status(400).json({ error: 'Nombre y precio de venta son requeridos' });
-        }
-
-        Producto.create({
-          nombre,
-          descripcion,
-          codigo,
-          precio_compra,
-          precio_venta,
-          stock_actual,
-          stock_minimo,
-          id_categoria,
-          id_proveedor,
-          imagen,
-          activo
-        }, (err, result) => {
-          if (err) {
-            console.error('❌ Error al crear producto:', err);
-            if (err.code === 'ER_DUP_ENTRY') {
-              return res.status(400).json({ error: 'Ya existe un producto con ese código' });
-            }
-            return res.status(500).json({ error: 'Error al crear producto', details: err.message });
-          }
-          console.log('✅ Producto creado exitosamente:', result);
-          res.status(201).json({ message: 'Producto creado exitosamente', id: result.insertId });
-        });
-      } catch (error) {
-        console.error('❌ Error inesperado en create:', error);
-        res.status(500).json({ error: 'Error al crear producto', details: error.message });
-      }
-    },
-
-     // Actualizar producto
-      // Actualizar producto
-      update: (req, res) => {
-        console.log('🔍 === INICIO UPDATE ===');
-        console.log('🔍 req.params:', req.params);
-        console.log('🔍 req.body completo:', JSON.stringify(req.body, null, 2));
-        console.log('🔍 req.body tipo:', typeof req.body);
-        console.log('🔍 req.body es nulo:', req.body === null);
-        console.log('🔍 req.body está vacío:', Object.keys(req.body || {}).length === 0);
-        console.log('🔍 req.headers:', req.headers['content-type']);
-        
-        const { id } = req.params;
-        const { nombre, descripcion, codigo, precio_compra, precio_venta, stock_actual, stock_minimo, id_categoria, id_proveedor, imagen, activo } = req.body || {};
-
-        console.log('📦 Actualizando producto ID:', id, 'Datos:', { nombre, descripcion, codigo, precio_compra, precio_venta, stock_actual, stock_minimo, id_categoria, id_proveedor, imagen, activo });
-
-       if (!nombre || !precio_venta) {
-         return res.status(400).json({ error: 'Nombre y precio de venta son requeridos' });
+         data = productoValido(req.body || {});
+       } catch (error) {
+         return res.status(error.status || 400).json({ error: error.message });
        }
-
-       Producto.findById(id, (err, results) => {
+       Producto.create(data, (err, result) => {
          if (err) {
-           console.error('❌ Error al verificar producto:', err);
-           return res.status(500).json({ error: 'Error al verificar producto' });
+           if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe un producto con ese código' });
+           return res.status(500).json({ error: 'Error al crear producto' });
          }
-         if (results.length === 0) {
-           return res.status(404).json({ error: 'Producto no encontrado' });
-         }
-
-         Producto.update(id, {
-           nombre,
-           descripcion,
-           codigo,
-           precio_compra,
-           precio_venta,
-           stock_actual,
-           stock_minimo,
-           id_categoria,
-           id_proveedor,
-           imagen,
-           activo
-         }, (err, result) => {
-           if (err) {
-             console.error('❌ Error al actualizar producto:', err);
-             if (err.code === 'ER_DUP_ENTRY') {
-               return res.status(400).json({ error: 'Ya existe un producto con ese código' });
-             }
-             return res.status(500).json({ error: 'Error al actualizar producto', details: err.message });
-           }
-           console.log('✅ Producto actualizado exitosamente');
-           res.json({ message: 'Producto actualizado exitosamente' });
-         });
+         res.status(201).json({ message: 'Producto creado exitosamente', id: result.insertId });
        });
      },
+
+      update: (req, res) => {
+        const id = Number(req.params.id);
+        let data;
+        try {
+          data = productoValido(req.body || {});
+        } catch (error) {
+          return res.status(error.status || 400).json({ error: error.message });
+        }
+        if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID de producto inválido' });
+        Producto.update(id, data, (err) => {
+          if (err) {
+            if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe un producto con ese código' });
+            return res.status(500).json({ error: 'Error al actualizar producto' });
+          }
+          res.json({ message: 'Producto actualizado exitosamente' });
+        });
+      },
 
    // Eliminar producto (soft delete)
    delete: (req, res) => {
@@ -196,23 +187,27 @@ const ProductoController = {
      });
    },
 
-    // Actualizar stock de producto
-    updateStock: (req, res) => {
-      const { id } = req.params;
-      const { cantidad } = req.body || {};
+     // Actualizar stock de producto
+     updateStock: (req, res) => {
+       const id = Number(req.params.id);
+       const cantidad = Number(req.body?.cantidad);
+       const motivo = String(req.body?.motivo || '').trim().slice(0, 255);
 
-      const cantidadNum = Number(cantidad);
-      if (cantidad === undefined || isNaN(cantidadNum) || cantidadNum < 0) {
-        return res.status(400).json({ error: 'Cantidad inválida' });
-      }
-
-      Producto.updateStock(id, cantidadNum, (err, result) => {
-       if (err) {
-         return res.status(500).json({ error: 'Error al actualizar stock' });
+       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID de producto inválido' });
+       if (!Number.isInteger(cantidad) || cantidad < 0) {
+         return res.status(400).json({ error: 'La cantidad debe ser un entero mayor o igual a 0' });
        }
-       res.json({ message: 'Stock actualizado exitosamente' });
-     });
-   },
+       if (!motivo) return res.status(400).json({ error: 'El motivo del ajuste es requerido' });
+
+       Ajuste.crear(id, cantidad, motivo, req.user.id_usuario, (err) => {
+         if (err) {
+           const status = err.code === 'PRODUCT_NOT_FOUND' ? 404 : 400;
+           return res.status(status).json({ error: err.message || 'Error al registrar el ajuste' });
+         }
+         registrarAccion(req, 'ajustar', 'producto', id, `Stock ajustado a ${cantidad}. Motivo: ${motivo}`);
+         res.json({ message: 'Stock actualizado exitosamente' });
+       });
+     },
 
    // Obtener producto por código
    getByCodigo: (req, res) => {
@@ -228,82 +223,71 @@ const ProductoController = {
      });
    },
 
-     // Crear producto con imagen
-     createWithImage: (req, res) => {
-       const { nombre, descripcion, codigo, precio_compra, precio_venta, stock_actual, stock_minimo, id_categoria, id_proveedor, activo } = req.body || {};
+     createWithImage: async (req, res) => {
+       if (!req.file) return res.status(400).json({ error: 'No se ha proporcionado ningún archivo' });
+       try {
+         await archivoValido(req.file);
+       } catch (error) {
+         eliminarArchivo(req.file);
+         return res.status(400).json({ error: 'El archivo no contiene una imagen válida' });
+       }
+       const imagen = `/uploads/productos/${req.file.filename}`;
+       let data;
+       try {
+         data = productoValido({ ...(req.body || {}), imagen });
+       } catch (error) {
+         eliminarArchivo(req.file);
+         return res.status(error.status || 400).json({ error: error.message });
+       }
+       Producto.create(data, (err, result) => {
+         if (err) {
+           eliminarArchivo(req.file);
+           if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe un producto con ese código' });
+           return res.status(500).json({ error: 'Error al crear producto' });
+         }
+         res.status(201).json({ message: 'Producto creado exitosamente', id: result.insertId, imagen });
+       });
+     },
 
-      if (!nombre || !precio_venta) {
-        return res.status(400).json({ error: 'Nombre y precio de venta son requeridos' });
-      }
+   uploadImage: async (req, res) => {
+     if (!req.file) return res.status(400).json({ error: 'No se ha proporcionado ningún archivo' });
+     const id = Number(req.params.id);
+     if (!Number.isInteger(id) || id <= 0) {
+       eliminarArchivo(req.file);
+       return res.status(400).json({ error: 'ID de producto inválido' });
+     }
 
-      if (!req.file) {
-        return res.status(400).json({ error: 'No se ha proporcionado ningún archivo' });
-      }
+     try {
+       await archivoValido(req.file);
+     } catch (error) {
+       eliminarArchivo(req.file);
+       return res.status(400).json({ error: 'El archivo no contiene una imagen válida' });
+     }
 
-      const imagen = `/uploads/productos/${req.file.filename}`;
+     Producto.findById(id, (err, results) => {
+       if (err) {
+         eliminarArchivo(req.file);
+         return res.status(500).json({ error: 'Error al verificar producto' });
+       }
+       if (results.length === 0) {
+         eliminarArchivo(req.file);
+         return res.status(404).json({ error: 'Producto no encontrado' });
+       }
 
-      Producto.create({
-        nombre,
-        descripcion,
-        codigo,
-        precio_compra,
-        precio_venta,
-        stock_actual,
-        stock_minimo,
-        id_categoria,
-        id_proveedor,
-        imagen,
-        activo
-      }, (err, result) => {
-        if (err) {
-          if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ error: 'Ya existe un producto con ese código' });
-          }
-          return res.status(500).json({ error: 'Error al crear producto' });
-        }
-        res.status(201).json({ message: 'Producto creado exitosamente', id: result.insertId, imagen });
-      });
-    },
-
-   // Subir imagen de producto
-    uploadImage: (req, res) => {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No se ha proporcionado ningún archivo' });
-      }
-
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-
-      if (!allowedTypes.includes(req.file.mimetype)) {
-        return res.status(400).json({ error: 'Tipo de archivo no permitido. Solo se permiten: JPG, PNG, GIF, WebP' });
-      }
-
-      const fileName = req.file.filename;
-
-      const id = (req.body || {}).id;
-
-      Producto.findById(id, (err, results) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al verificar producto' });
-        }
-        if (results.length === 0) {
-          return res.status(404).json({ error: 'Producto no encontrado' });
-        }
-
-        const updateData = {
-          imagen: `/uploads/productos/${fileName}`
-        };
-
-        Producto.update(id, updateData, (err, result) => {
-          if (err) {
-            return res.status(500).json({ error: 'Error al actualizar producto' });
-          }
-          if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Producto no encontrado' });
-          }
-          res.json({ message: 'Imagen subida exitosamente', imagen: updateData.imagen });
-        });
-      });
-    }
+       const imagen = `/uploads/productos/${req.file.filename}`;
+       Producto.updateImage(id, imagen, (error, result) => {
+         if (error) {
+           eliminarArchivo(req.file);
+           return res.status(500).json({ error: 'Error al actualizar producto' });
+         }
+         if (result.affectedRows === 0) {
+           eliminarArchivo(req.file);
+           return res.status(404).json({ error: 'Producto no encontrado' });
+         }
+         res.json({ message: 'Imagen subida exitosamente', imagen });
+       });
+     });
+   }
 };
 
 module.exports = ProductoController;

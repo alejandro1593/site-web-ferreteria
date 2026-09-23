@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const ProductoController = require('../controllers/ProductoController');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
@@ -18,19 +19,26 @@ const upload = multer({
       cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
+      const uniqueSuffix = crypto.randomUUID();
+      cb(null, uniqueSuffix + path.extname(file.originalname).toLowerCase());
     }
   }),
   limits: {
     fileSize: 5 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
+    const allowedTypes = {
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/jpg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/gif': ['.gif'],
+      'image/webp': ['.webp']
+    };
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes[file.mimetype] && allowedTypes[file.mimetype].includes(extension)) {
       cb(null, true);
     } else {
-      cb(new Error('Tipo de archivo no permitido'));
+      cb(new Error('Tipo o extensión de archivo no permitido'));
     }
   }
 });

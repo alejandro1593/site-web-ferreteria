@@ -1,32 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Venta = {
-  // Crear tabla si no existe
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS ventas (
-        id_venta INT AUTO_INCREMENT PRIMARY KEY,
-        id_cliente INT,
-        fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-        subtotal DECIMAL(10,2),
-        iva DECIMAL(10,2),
-        descuento DECIMAL(10,2) DEFAULT 0,
-        total DECIMAL(10,2),
-        metodo_pago VARCHAR(50),
-        estado VARCHAR(20) DEFAULT 'completada',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON DELETE SET NULL
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla ventas:', err);
-      } else {
-        console.log('Tabla ventas verificada/creada');
-      }
-    });
-  },
-
   // Obtener todas las ventas con cliente y total de items
   // Opcionalmente acepta { limit, offset } para paginación
   findAll: (options, callback) => {
@@ -35,14 +9,12 @@ const Venta = {
       options = {};
     }
     let sql = `
-      SELECT v.*, 
-        CONCAT(c.nombre, ' ', c.apellido) as cliente_nombre, 
+      SELECT v.*,
+        CONCAT(c.nombre, ' ', c.apellido) as cliente_nombre,
         c.dni as cliente_dni,
-        COUNT(vd.id_detalle) as total_items
-      FROM ventas v 
+        COALESCE((SELECT SUM(vd.cantidad) FROM venta_detalle vd WHERE vd.id_venta = v.id_venta), 0)::integer as total_items
+      FROM ventas v
       LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
-      LEFT JOIN venta_detalle vd ON v.id_venta = vd.id_venta
-      GROUP BY v.id_venta
       ORDER BY v.fecha DESC
     `;
     const params = [];
@@ -74,7 +46,8 @@ const Venta = {
         c.dni as cliente_dni 
       FROM ventas v 
       LEFT JOIN clientes c ON v.id_cliente = c.id_cliente 
-      WHERE DATE(v.fecha) BETWEEN ? AND ? 
+      WHERE v.fecha >= CAST(? AS date)
+        AND v.fecha < CAST(? AS date) + INTERVAL '1 day'
       ORDER BY v.fecha DESC
     `;
     connection.query(sql, [fechaInicio, fechaFin], callback);
@@ -98,7 +71,7 @@ const Venta = {
   create: (data, callback) => {
     const sql = `
       INSERT INTO ventas (id_cliente, subtotal, iva, descuento, total, metodo_pago, estado, saldo_pendiente) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id_venta
     `;
     connection.query(sql, [
       data.id_cliente || null, 
@@ -131,10 +104,10 @@ const Venta = {
     ], callback);
   },
 
-  // Eliminar venta
   delete: (id, callback) => {
-    const sql = 'DELETE FROM ventas WHERE id_venta = ?';
-    connection.query(sql, [id], callback);
+    const error = new Error('Las ventas no se eliminan; deben anularse');
+    error.code = 'SALE_DELETE_DISABLED';
+    callback(error);
   },
 
   // Obtener ventas del día
@@ -144,7 +117,8 @@ const Venta = {
         CONCAT(c.nombre, ' ', c.apellido) as cliente_nombre 
       FROM ventas v 
       LEFT JOIN clientes c ON v.id_cliente = c.id_cliente 
-      WHERE DATE(v.fecha) = CURDATE() 
+      WHERE v.fecha >= CURRENT_DATE
+        AND v.fecha < CURRENT_DATE + INTERVAL '1 day'
       ORDER BY v.fecha DESC
     `;
     connection.query(sql, callback);
@@ -159,8 +133,10 @@ const Venta = {
         SUM(subtotal) as total_subtotal,
         SUM(iva) as total_iva,
         AVG(total) as promedio_venta
-      FROM ventas 
-      WHERE fecha BETWEEN ? AND ? AND estado = 'completada'
+      FROM ventas
+      WHERE fecha >= CAST(? AS date)
+        AND fecha < CAST(? AS date) + INTERVAL '1 day'
+        AND estado = 'completada'
     `;
     connection.query(sql, [fechaInicio, fechaFin], callback);
   },
@@ -168,7 +144,7 @@ const Venta = {
   // Obtener historial de compras de un cliente con detalles
   getHistorialCliente: (idCliente, fechaInicio, fechaFin, callback) => {
     const sql = `
-      SELECT 
+      SELECT
         v.id_venta,
         v.fecha,
         v.subtotal,
@@ -177,13 +153,20 @@ const Venta = {
         v.total,
         v.metodo_pago,
         v.estado,
-        GROUP_CONCAT(CONCAT(vd.cantidad, 'x ', p.nombre) SEPARATOR ', ') as productos_resumen,
-        COUNT(vd.id_detalle) as total_items
+        d.productos_resumen,
+        COALESCE(d.total_items, 0)::integer as total_items
       FROM ventas v
-      LEFT JOIN venta_detalle vd ON v.id_venta = vd.id_venta
-      LEFT JOIN productos p ON vd.id_producto = p.id_producto
-      WHERE v.id_cliente = ? AND v.fecha BETWEEN ? AND ?
-      GROUP BY v.id_venta
+      LEFT JOIN (
+        SELECT vd.id_venta,
+          STRING_AGG(CONCAT(vd.cantidad, 'x ', p.nombre), ', ' ORDER BY vd.id_detalle) as productos_resumen,
+          SUM(vd.cantidad)::integer as total_items
+        FROM venta_detalle vd
+        JOIN productos p ON vd.id_producto = p.id_producto
+        GROUP BY vd.id_venta
+      ) d ON d.id_venta = v.id_venta
+      WHERE v.id_cliente = ?
+        AND v.fecha >= CAST(? AS date)
+        AND v.fecha < CAST(? AS date) + INTERVAL '1 day'
       ORDER BY v.fecha DESC
     `;
     connection.query(sql, [idCliente, fechaInicio, fechaFin], callback);
@@ -192,16 +175,23 @@ const Venta = {
   // Obtener resumen de compras de un cliente por período
   getResumenCliente: (idCliente, fechaInicio, fechaFin, callback) => {
     const sql = `
-      SELECT 
-        COUNT(v.id_venta) as total_compras,
-        SUM(v.total) as total_gastado,
-        SUM(v.subtotal) as total_subtotal,
-        SUM(v.iva) as total_iva,
-        AVG(v.total) as promedio_compra,
-        SUM(vd.cantidad) as total_productos
+      SELECT
+        COUNT(*)::integer as total_compras,
+        COALESCE(SUM(v.total), 0) as total_gastado,
+        COALESCE(SUM(v.subtotal), 0) as total_subtotal,
+        COALESCE(SUM(v.iva), 0) as total_iva,
+        COALESCE(AVG(v.total), 0) as promedio_compra,
+        COALESCE(SUM(d.total_productos), 0)::integer as total_productos
       FROM ventas v
-      LEFT JOIN venta_detalle vd ON v.id_venta = vd.id_venta
-      WHERE v.id_cliente = ? AND v.fecha BETWEEN ? AND ? AND v.estado = 'completada'
+      LEFT JOIN (
+        SELECT id_venta, SUM(cantidad)::integer as total_productos
+        FROM venta_detalle
+        GROUP BY id_venta
+      ) d ON d.id_venta = v.id_venta
+      WHERE v.id_cliente = ?
+        AND v.fecha >= CAST(? AS date)
+        AND v.fecha < CAST(? AS date) + INTERVAL '1 day'
+        AND v.estado = 'completada'
     `;
     connection.query(sql, [idCliente, fechaInicio, fechaFin], callback);
   },
@@ -223,24 +213,47 @@ const Venta = {
   },
 
   // Registrar abono a una venta a crédito
-  abonar: (id, monto, callback) => {
-    connection.query(
-      'SELECT total, saldo_pendiente FROM ventas WHERE id_venta = ? FOR UPDATE',
-      [id],
-      (err, results) => {
-        if (err) return callback(err);
-        if (results.length === 0) return callback({ message: 'Venta no encontrada' });
-
-        const venta = results[0];
-        const nuevoSaldo = Math.max(venta.saldo_pendiente - monto, 0);
-
-        connection.query(
-          'UPDATE ventas SET saldo_pendiente = ?, estado = IF(? <= 0, \'completada\', \'pendiente\') WHERE id_venta = ?',
-          [nuevoSaldo, nuevoSaldo, id],
-          (err) => callback(err, { saldo_anterior: venta.saldo_pendiente, saldo_nuevo: nuevoSaldo })
-        );
+  abonar: (id, monto, idUsuario, callback) => {
+    connection.withTransaction(async (client) => {
+      const result = await client.query(
+        'SELECT total, saldo_pendiente FROM ventas WHERE id_venta = $1 FOR UPDATE',
+        [id]
+      );
+      if (result.rows.length === 0) {
+        const error = new Error('Venta no encontrada');
+        error.code = 'NOT_FOUND';
+        throw error;
       }
-    );
+
+      const venta = result.rows[0];
+      const saldoAnterior = Number(venta.saldo_pendiente);
+      const montoAplicado = Math.min(saldoAnterior, Number(monto));
+      if (montoAplicado <= 0) {
+        const error = new Error('La venta no tiene saldo pendiente');
+        error.code = 'NO_BALANCE';
+        throw error;
+      }
+      const nuevoSaldo = Math.max(saldoAnterior - montoAplicado, 0);
+      const nuevoEstado = nuevoSaldo === 0 ? 'completada' : 'pendiente';
+      const cajaResult = idUsuario
+        ? await client.query(
+          "SELECT id_caja FROM caja WHERE id_usuario = $1 AND estado = 'abierta' ORDER BY fecha_apertura DESC LIMIT 1",
+          [idUsuario]
+        )
+        : { rows: [] };
+
+      await client.query(
+        'UPDATE ventas SET saldo_pendiente = $1, estado = $2 WHERE id_venta = $3',
+        [nuevoSaldo, nuevoEstado, id]
+      );
+      await client.query(
+        `INSERT INTO pagos_venta (id_venta, id_caja, id_usuario, tipo, monto, metodo)
+         VALUES ($1, $2, $3, 'abono', $4, 'efectivo')`,
+        [id, cajaResult.rows[0]?.id_caja || null, idUsuario || null, montoAplicado]
+      );
+
+      return { saldo_anterior: saldoAnterior, saldo_nuevo: nuevoSaldo, monto_aplicado: montoAplicado };
+    }).then((result) => callback(null, result)).catch(callback);
   },
 
   // ---- Ganancias (usa precio de compra como costo aproximado) ----
@@ -259,14 +272,12 @@ const Venta = {
       FROM venta_detalle vd
       JOIN ventas v ON vd.id_venta = v.id_venta
       LEFT JOIN productos p ON vd.id_producto = p.id_producto
-      WHERE DATE(v.fecha) BETWEEN ? AND ?
+      WHERE v.fecha >= CAST(? AS date)
+        AND v.fecha < CAST(? AS date) + INTERVAL '1 day'
         AND v.estado = 'completada'
     `;
     connection.query(sql, [fechaInicio, fechaFin], callback);
   }
 };
-
-// Inicializar tabla
-Venta.crearTabla();
 
 module.exports = Venta;

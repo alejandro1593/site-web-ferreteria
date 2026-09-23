@@ -1,37 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Producto = {
-  // Crear tabla si no existe
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS productos (
-        id_producto INT AUTO_INCREMENT PRIMARY KEY,
-        nombre VARCHAR(150) NOT NULL,
-        descripcion TEXT,
-        codigo VARCHAR(50) UNIQUE,
-        precio_compra DECIMAL(10,2),
-        precio_venta DECIMAL(10,2) NOT NULL,
-        stock_actual INT DEFAULT 0,
-        stock_minimo INT DEFAULT 0,
-        id_categoria INT,
-        id_proveedor INT,
-        imagen VARCHAR(255),
-        activo BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria) ON DELETE SET NULL,
-        FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor) ON DELETE SET NULL
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla productos:', err);
-      } else {
-        console.log('Tabla productos verificada/creada');
-      }
-    });
-  },
-
   // Obtener todos los productos con sus relaciones
   // Opcionalmente acepta { limit, offset } para paginación
   findAll: (options, callback) => {
@@ -102,7 +71,7 @@ const Producto = {
   create: (data, callback) => {
     const sql = `
       INSERT INTO productos (nombre, descripcion, codigo, precio_compra, precio_venta, stock_actual, stock_minimo, id_categoria, id_proveedor, imagen, activo) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id_producto
     `;
     connection.query(sql, [
       data.nombre, 
@@ -124,7 +93,7 @@ const Producto = {
     const sql = `
       UPDATE productos 
       SET nombre = ?, descripcion = ?, codigo = ?, precio_compra = ?, precio_venta = ?, 
-          stock_actual = ?, stock_minimo = ?, id_categoria = ?, id_proveedor = ?, imagen = ?, activo = ? 
+          stock_minimo = ?, id_categoria = ?, id_proveedor = ?, imagen = ?, activo = ?
       WHERE id_producto = ?
     `;
     connection.query(sql, [
@@ -133,7 +102,6 @@ const Producto = {
       data.codigo, 
       data.precio_compra, 
       data.precio_venta, 
-      data.stock_actual, 
       data.stock_minimo, 
       data.id_categoria, 
       data.id_proveedor, 
@@ -149,10 +117,9 @@ const Producto = {
     connection.query(sql, [id], callback);
   },
 
-  // Actualizar stock
-  updateStock: (id, cantidad, callback) => {
-    const sql = 'UPDATE productos SET stock_actual = ? WHERE id_producto = ?';
-    connection.query(sql, [cantidad, id], callback);
+  updateImage: (id, imagen, callback) => {
+    const sql = 'UPDATE productos SET imagen = ? WHERE id_producto = ? RETURNING id_producto';
+    connection.query(sql, [imagen, id], callback);
   },
 
   // Obtener productos con stock bajo
@@ -161,7 +128,7 @@ const Producto = {
       SELECT p.*, c.nombre as categoria_nombre 
       FROM productos p 
       LEFT JOIN categorias c ON p.id_categoria = c.id_categoria 
-      WHERE p.stock_actual < 20 AND p.activo = TRUE 
+      WHERE p.stock_actual <= p.stock_minimo AND p.activo = TRUE
       ORDER BY p.stock_actual ASC
     `;
     connection.query(sql, callback);
@@ -173,8 +140,5 @@ const Producto = {
     connection.query(sql, [codigo], callback);
   }
 };
-
-// Inicializar tabla
-Producto.crearTabla();
 
 module.exports = Producto;

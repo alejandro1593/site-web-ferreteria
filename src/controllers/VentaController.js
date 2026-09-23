@@ -1,6 +1,6 @@
+const connection = require('../config/db_postgres');
 const Venta = require('../models/Venta');
 const VentaDetalle = require('../models/VentaDetalle');
-const Producto = require('../models/Producto');
 const { registrarAccion } = require('../utils/audit');
 
 const VentaController = {
@@ -8,9 +8,14 @@ const VentaController = {
   getAll: (req, res) => {
     const { page, limit } = req.query;
     const options = {};
-    if (page && limit) {
-      options.limit = Math.min(Number(limit), 200);
-      options.offset = (Math.max(Number(page), 1) - 1) * options.limit;
+    if (page !== undefined || limit !== undefined) {
+      const pageNumber = Number(page);
+      const limitNumber = Number(limit);
+      if (!Number.isInteger(pageNumber) || pageNumber < 1 || !Number.isInteger(limitNumber) || limitNumber < 1 || limitNumber > 200) {
+        return res.status(400).json({ error: 'Parámetros de paginación inválidos' });
+      }
+      options.limit = limitNumber;
+      options.offset = (pageNumber - 1) * limitNumber;
     }
     Venta.findAll(options, (err, results) => {
       if (err) {
@@ -135,135 +140,197 @@ const VentaController = {
     });
   },
 
-  // Crear nueva venta
-  create: (req, res) => {
+  create: async (req, res) => {
     const { id_cliente, detalles, metodo_pago, descuento = 0 } = req.body || {};
-    
-    if (!detalles || detalles.length === 0) {
+
+    if (!Array.isArray(detalles) || detalles.length === 0) {
       return res.status(400).json({ error: 'Se debe incluir al menos un detalle' });
     }
 
+    const metodosValidos = new Set(['efectivo', 'tarjeta', 'transferencia', 'credito']);
+    if (!metodosValidos.has(metodo_pago)) {
+      return res.status(400).json({ error: 'Método de pago inválido' });
+    }
+
     const esCredito = metodo_pago === 'credito';
-    if (esCredito && !id_cliente) {
+    const clienteId = id_cliente === undefined || id_cliente === null || id_cliente === '' ? null : Number(id_cliente);
+    if (clienteId !== null && (!Number.isInteger(clienteId) || clienteId <= 0)) {
+      return res.status(400).json({ error: 'Cliente inválido' });
+    }
+    if (esCredito && clienteId === null) {
       return res.status(400).json({ error: 'Las ventas a crédito requieren un cliente registrado' });
     }
 
-    // Validar y procesar detalles
-    let subtotal = 0;
-    const promises = detalles.map(detalle => {
-      return new Promise((resolve, reject) => {
-        Producto.findById(detalle.id_producto, (err, results) => {
-          if (err) {
-            return reject(err);
-          }
-          if (results.length === 0) {
-            return reject(new Error(`Producto ${detalle.id_producto} no encontrado`));
-          }
-          const producto = results[0];
-          if (producto.stock_actual < detalle.cantidad) {
-            return reject(new Error(`Stock insuficiente para ${producto.nombre}`));
-          }
-          detalle.precio_unitario = producto.precio_venta;
-          detalle.subtotal = producto.precio_venta * detalle.cantidad;
-          subtotal += detalle.subtotal;
-          resolve(detalle);
-        });
-      });
-    });
+    const descuentoNumero = Number(descuento);
+    if (!Number.isFinite(descuentoNumero) || descuentoNumero < 0) {
+      return res.status(400).json({ error: 'El descuento debe ser un número válido' });
+    }
+    const descuentoCentavos = Math.round(descuentoNumero * 100);
 
-    Promise.all(promises)
-      .then(() => {
-        const iva = subtotal * 0.16; // 16% IVA
-        const total = subtotal + iva - descuento;
+    const productosSolicitados = new Map();
+    for (const detalle of detalles) {
+      const idProducto = Number(detalle && detalle.id_producto);
+      const cantidad = Number(detalle && detalle.cantidad);
+      if (!Number.isInteger(idProducto) || idProducto <= 0 || !Number.isInteger(cantidad) || cantidad <= 0) {
+        return res.status(400).json({ error: 'Cada detalle requiere producto y cantidad enteros positivos' });
+      }
+      productosSolicitados.set(idProducto, (productosSolicitados.get(idProducto) || 0) + cantidad);
+    }
 
-          Venta.create({
-            id_cliente,
-            subtotal,
-            iva,
-            descuento,
-            total,
+    try {
+      const resultado = await connection.withTransaction(async (client) => {
+        const productos = [];
+        const ids = [...productosSolicitados.keys()].sort((a, b) => a - b);
+        for (const idProducto of ids) {
+          const productResult = await client.query(
+            'SELECT id_producto, nombre, precio_venta, stock_actual FROM productos WHERE id_producto = $1 AND activo = TRUE FOR UPDATE',
+            [idProducto]
+          );
+          if (productResult.rowCount === 0) {
+            const error = new Error(`Producto ${idProducto} no encontrado`);
+            error.status = 400;
+            throw error;
+          }
+          const producto = productResult.rows[0];
+          const cantidad = productosSolicitados.get(idProducto);
+          if (Number(producto.stock_actual) < cantidad) {
+            const error = new Error(`Stock insuficiente para ${producto.nombre}`);
+            error.status = 400;
+            throw error;
+          }
+          productos.push({ ...producto, cantidad });
+        }
+
+        const cajaResult = await client.query(
+          "SELECT id_caja FROM caja WHERE id_usuario = $1 AND estado = 'abierta' ORDER BY fecha_apertura DESC LIMIT 1",
+          [req.user.id_usuario || null]
+        );
+        const idCaja = cajaResult.rows[0] ? cajaResult.rows[0].id_caja : null;
+        const subtotalCentavos = productos.reduce((sum, producto) => sum + Math.round(Number(producto.precio_venta) * 100) * producto.cantidad, 0);
+        const ivaCentavos = Math.round(subtotalCentavos * 0.16);
+        const totalCentavos = subtotalCentavos + ivaCentavos - descuentoCentavos;
+        if (totalCentavos < 0) {
+          const error = new Error('El descuento no puede superar el total de la venta');
+          error.status = 400;
+          throw error;
+        }
+
+        const ventaResult = await client.query(
+          `INSERT INTO ventas (id_cliente, id_usuario, id_caja, subtotal, iva, descuento, total, metodo_pago, estado, saldo_pendiente)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           RETURNING id_venta`,
+          [
+            clienteId,
+            req.user.id_usuario || null,
+            idCaja,
+            subtotalCentavos / 100,
+            ivaCentavos / 100,
+            descuentoCentavos / 100,
+            totalCentavos / 100,
             metodo_pago,
-            estado: esCredito ? 'pendiente' : 'completada',
-            saldo_pendiente: esCredito ? total : 0
-          }, (err, result) => {
-            if (err) {
-              return res.status(500).json({ error: 'Error al crear venta' });
-            }
+            esCredito ? 'pendiente' : 'completada',
+            esCredito ? totalCentavos / 100 : 0
+          ]
+        );
+        const idVenta = ventaResult.rows[0].id_venta;
 
-            const idVenta = result.insertId;
+        for (const producto of productos) {
+          const subtotal = Math.round(Number(producto.precio_venta) * 100) * producto.cantidad;
+          await client.query(
+            `INSERT INTO venta_detalle (id_venta, id_producto, cantidad, precio_unitario, subtotal)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [idVenta, producto.id_producto, producto.cantidad, producto.precio_venta, subtotal / 100]
+          );
+          const stockResult = await client.query(
+            'UPDATE productos SET stock_actual = stock_actual - $1 WHERE id_producto = $2 AND stock_actual >= $1',
+            [producto.cantidad, producto.id_producto]
+          );
+          if (stockResult.rowCount !== 1) {
+            const error = new Error(`Stock insuficiente para ${producto.nombre}`);
+            error.status = 409;
+            throw error;
+          }
+        }
 
-          // Crear detalles y actualizar stock
-          const detallePromises = detalles.map(detalle => {
-            return new Promise((resolve, reject) => {
-              // Crear detalle
-              VentaDetalle.create({
-                id_venta: idVenta,
-                id_producto: detalle.id_producto,
-                cantidad: detalle.cantidad,
-                precio_unitario: detalle.precio_unitario,
-                subtotal: detalle.subtotal
-              }, (err) => {
-                if (err) {
-                  return reject(err);
-                }
-
-                // Actualizar stock
-                Producto.findById(detalle.id_producto, (err, results) => {
-                  if (err) {
-                    return reject(err);
-                  }
-                  const nuevoStock = results[0].stock_actual - detalle.cantidad;
-                  Producto.updateStock(detalle.id_producto, nuevoStock, (err) => {
-                    if (err) {
-                      return reject(err);
-                    }
-                    resolve();
-                  });
-                });
-              });
-            });
-          });
-
-          Promise.all(detallePromises)
-            .then(() => {
-              registrarAccion(req, 'crear', 'venta', idVenta, `Total ${total}${esCredito ? ' (crédito)' : ''}`);
-              res.status(201).json({ 
-                message: 'Venta creada exitosamente', 
-                id: idVenta,
-                total,
-                saldo_pendiente: esCredito ? total : 0
-              });
-            })
-            .catch(err => {
-              res.status(500).json({ error: 'Error al crear detalles de venta' });
-            });
-        });
-      })
-      .catch(err => {
-        res.status(400).json({ error: err.message || 'Error en el procesamiento de la venta' });
+        return {
+          idVenta,
+          total: totalCentavos / 100,
+          saldoPendiente: esCredito ? totalCentavos / 100 : 0
+        };
       });
+
+      registrarAccion(req, 'crear', 'venta', resultado.idVenta, `Total ${resultado.total}${esCredito ? ' (crédito)' : ''}`);
+      res.status(201).json({
+        message: 'Venta creada exitosamente',
+        id: resultado.idVenta,
+        total: resultado.total,
+        saldo_pendiente: resultado.saldoPendiente
+      });
+    } catch (error) {
+      const status = error.status || (error.code === '23503' ? 400 : 500);
+      res.status(status).json({ error: status === 500 ? 'Error al crear la venta' : error.message });
+    }
   },
 
-  // Eliminar venta
-  delete: (req, res) => {
-    const { id } = req.params;
-    
-    Venta.findById(id, (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error al verificar venta' });
-      }
-      if (results.length === 0) {
-        return res.status(404).json({ error: 'Venta no encontrada' });
-      }
+  delete: async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID de venta inválido' });
 
-      Venta.delete(id, (err, result) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al eliminar venta' });
+    try {
+      const total = await connection.withTransaction(async (client) => {
+        const ventaResult = await client.query(
+          'SELECT total, saldo_pendiente, estado FROM ventas WHERE id_venta = $1 FOR UPDATE',
+          [id]
+        );
+        if (ventaResult.rowCount === 0) {
+          const error = new Error('Venta no encontrada');
+          error.status = 404;
+          throw error;
         }
-        registrarAccion(req, 'eliminar', 'venta', id, `Total ${results[0].total}`);
-        res.json({ message: 'Venta eliminada exitosamente' });
+        if (ventaResult.rows[0].estado === 'anulada') {
+          const error = new Error('La venta ya está anulada');
+          error.status = 409;
+          throw error;
+        }
+        if (Number(ventaResult.rows[0].saldo_pendiente) > 0) {
+          const error = new Error('No se puede anular una venta con saldo pendiente');
+          error.status = 409;
+          throw error;
+        }
+        const devoluciones = await client.query(
+          'SELECT 1 FROM devoluciones WHERE id_venta = $1 LIMIT 1',
+          [id]
+        );
+        if (devoluciones.rowCount > 0) {
+          const error = new Error('No se puede anular una venta con devoluciones');
+          error.status = 409;
+          throw error;
+        }
+
+        const detalles = await client.query(
+          'SELECT id_producto, cantidad FROM venta_detalle WHERE id_venta = $1',
+          [id]
+        );
+        for (const detalle of detalles.rows) {
+          const stockResult = await client.query(
+            'UPDATE productos SET stock_actual = stock_actual + $1 WHERE id_producto = $2',
+            [detalle.cantidad, detalle.id_producto]
+          );
+          if (stockResult.rowCount !== 1) {
+            const error = new Error('No se pudo restaurar el stock de la venta');
+            error.status = 409;
+            throw error;
+          }
+        }
+        await client.query("UPDATE ventas SET estado = 'anulada' WHERE id_venta = $1", [id]);
+        return Number(ventaResult.rows[0].total);
       });
-    });
+      registrarAccion(req, 'anular', 'venta', id, `Total ${total}`);
+      res.json({ message: 'Venta anulada exitosamente' });
+    } catch (error) {
+      const status = error.status || 500;
+      res.status(status).json({ error: status === 500 ? 'Error al anular venta' : error.message });
+    }
   },
 
   // ---- Créditos (fiados) ----
@@ -276,29 +343,23 @@ const VentaController = {
     });
   },
 
-  // Registrar abono a venta a crédito
   abonar: (req, res) => {
-    const { id } = req.params;
-    const { monto } = req.body || {};
+    const id = Number(req.params.id);
+    const monto = Number(req.body?.monto);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'ID de venta inválido' });
+    if (!Number.isFinite(monto) || monto <= 0) return res.status(400).json({ error: 'El monto del abono debe ser mayor a 0' });
 
-    if (!monto || monto <= 0) {
-      return res.status(400).json({ error: 'El monto del abono debe ser mayor a 0' });
-    }
-
-    Venta.findById(id, (err, results) => {
-      if (err) return res.status(500).json({ error: 'Error al verificar la venta' });
-      if (results.length === 0) return res.status(404).json({ error: 'Venta no encontrada' });
-      if (results[0].saldo_pendiente <= 0) return res.status(400).json({ error: 'La venta no tiene saldo pendiente' });
-
-      Venta.abonar(id, Number(monto), (err, resultado) => {
-        if (err) return res.status(500).json({ error: err.message || 'Error al registrar el abono' });
-        registrarAccion(req, 'abonar', 'venta', id, `Abono de ${monto}. Saldo restante: ${resultado.saldo_nuevo}`);
-        res.json({
-          message: 'Abono registrado exitosamente',
-          saldo_anterior: resultado.saldo_anterior,
-          saldo_pendiente: resultado.saldo_nuevo,
-          pagado: resultado.saldo_nuevo === 0
-        });
+    Venta.abonar(id, monto, req.user.id_usuario || null, (err, resultado) => {
+      if (err) {
+        const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'NO_BALANCE' ? 400 : 500;
+        return res.status(status).json({ error: status === 500 ? 'Error al registrar el abono' : err.message });
+      }
+      registrarAccion(req, 'abonar', 'venta', id, `Abono de ${resultado.monto_aplicado}. Saldo restante: ${resultado.saldo_nuevo}`);
+      res.json({
+        message: 'Abono registrado exitosamente',
+        saldo_anterior: resultado.saldo_anterior,
+        saldo_pendiente: resultado.saldo_nuevo,
+        pagado: resultado.saldo_nuevo === 0
       });
     });
   },

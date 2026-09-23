@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const connection = require('../config/db_mysql');
 const Ajuste = require('../models/Ajuste');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { registrarAccion } = require('../utils/audit');
 
+const financeRoles = roleMiddleware(['admin', 'gerente', 'supervisor', 'cajero']);
 const adminOGerente = roleMiddleware(['admin', 'gerente']);
 
 // GET /api/ajustes - Historial de ajustes de inventario
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, financeRoles, (req, res) => {
   Ajuste.findAll((err, results) => {
     if (err) return res.status(500).json({ error: 'Error al obtener ajustes' });
     res.json(results);

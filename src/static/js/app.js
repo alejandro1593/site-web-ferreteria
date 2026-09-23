@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = '/api';
 
 // Escapar HTML para prevenir XSS al renderizar datos con innerHTML
 function esc(value) {
@@ -29,7 +29,7 @@ async function fetchAPI(endpoint, options = {}) {
 
     const finalOptions = { ...options };
 
-    if (options.body && typeof options.body === 'object') {
+    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
         finalOptions.body = JSON.stringify(options.body);
     }
 
@@ -68,11 +68,7 @@ async function fetchAPIAuth(endpoint, options = {}) {
     }
 
     const token = localStorage.getItem('token');
-    console.log(`🔑 Token existe: ${!!token}`);
-    if (token) {
-        console.log(`🔑 Token (primeros 50): ${token.substring(0, 50)}...`);
-        options.headers['Authorization'] = `Bearer ${token}`;
-    }
+    if (token) options.headers['Authorization'] = `Bearer ${token}`;
 
     const defaultOptions = {
         headers: {
@@ -82,12 +78,9 @@ async function fetchAPIAuth(endpoint, options = {}) {
 
     const finalOptions = { ...options };
 
-    if (options.body && typeof options.body === 'object') {
-        console.log(`📦 Body antes de stringify:`, options.body);
+    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
         finalOptions.body = JSON.stringify(options.body);
-        console.log(`📦 Body después de stringify:`, finalOptions.body.substring(0, 200) + '...');
     } else if (options.body) {
-        console.log(`📦 Body es string u otro tipo, usando directamente:`, typeof options.body);
         finalOptions.body = options.body;
     }
 
@@ -103,9 +96,7 @@ async function fetchAPIAuth(endpoint, options = {}) {
 
         // Si el token expiró o es inválido (401)
         if (response.status === 401) {
-            const errorText = await response.text();
-            console.log('❌ Error 401 - Respuesta del servidor:', errorText);
-            
+            await response.text();
             if (typeof logout === 'function') {
                 logout();
             } else {
@@ -123,27 +114,14 @@ async function fetchAPIAuth(endpoint, options = {}) {
             const contentType = response.headers.get('content-type');
             console.log('❌ Content-Type:', contentType);
 
-            try {
-                if (contentType && contentType.includes('application/json')) {
-                    const errorData = await response.json();
-                    console.log('❌ Error data from server:', errorData);
-                    let errorMessage = errorData.error || errorData.message || '';
-                    if (errorData.details) {
-                        errorMessage += ` (${errorData.details})`;
-                    }
-                    if (!errorMessage) {
-                        errorMessage = `HTTP error! status: ${status} - ${statusText}`;
-                    }
-                    throw new Error(errorMessage);
-                } else {
-                    const errorText = await response.text();
-                    console.log('❌ Error text from server:', errorText);
-                    throw new Error(`HTTP error! status: ${status} - ${errorText || statusText}`);
-                }
-            } catch (jsonError) {
-                console.log('❌ Error parsing response:', jsonError);
-                throw new Error(`HTTP error! status: ${status} - ${statusText}`);
+            if (contentType && contentType.includes('application/json')) {
+                const errorData = await response.json();
+                let errorMessage = errorData.error || errorData.message || `HTTP error! status: ${status} - ${statusText}`;
+                if (errorData.details) errorMessage += ` (${errorData.details})`;
+                throw new Error(errorMessage);
             }
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${status} - ${errorText || statusText}`);
         }
 
         const data = await response.json();
@@ -166,6 +144,7 @@ function formatCurrency(amount) {
 }
 
 function formatDate(dateString) {
+    if (!dateString) return 'Sin fecha';
     const date = new Date(dateString);
     return date.toLocaleDateString('es-MX', {
         year: 'numeric',
@@ -175,6 +154,7 @@ function formatDate(dateString) {
 }
 
 function formatDateTime(dateString) {
+    if (!dateString) return 'Sin fecha';
     const date = new Date(dateString);
     return date.toLocaleString('es-MX', {
         year: 'numeric',
@@ -191,7 +171,7 @@ function showNotification(message, type = 'success') {
     notification.innerHTML = `
         <div class="notification-content">
             <span class="notification-icon">${type === 'success' ? '✓' : '✕'}</span>
-            <span class="notification-message">${message}</span>
+            <span class="notification-message">${esc(message)}</span>
         </div>
     `;
     
@@ -336,7 +316,7 @@ function getStatusBadge(status) {
     
     const label = labels[status] || status;
     
-    return `<span class="status-badge ${badgeClass}">${label}</span>`;
+    return `<span class="status-badge ${badgeClass}">${esc(label)}</span>`;
 }
 
 function getPaymentMethodBadge(method) {
@@ -347,7 +327,7 @@ function getPaymentMethodBadge(method) {
         'cheque': '📄 Cheque'
     };
     
-    return methods[method] || method;
+    return methods[method] || esc(method);
 }
 
 function confirmAction(message, onConfirm) {

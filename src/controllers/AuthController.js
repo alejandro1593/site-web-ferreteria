@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Usuario = require('../models/Usuario');
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
+const { registrarAccion } = require('../utils/audit');
 
 const AuthController = {
   // Login de usuario
@@ -45,10 +46,11 @@ const AuthController = {
           username: usuario.username,
           nombre: usuario.nombre,
           email: usuario.email,
-          rol: usuario.rol
+          rol: usuario.rol,
+          token_version: Number(usuario.token_version || 0)
         },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
       );
 
       // Preparar datos de respuesta (sin password)
@@ -82,8 +84,8 @@ const AuthController = {
     }
 
     // Validar longitud de contraseña
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
     }
 
     // Validar que el rol sea uno de los permitidos
@@ -112,6 +114,7 @@ const AuthController = {
           return res.status(500).json({ error: 'Error al crear usuario' });
         }
 
+        registrarAccion(req, 'crear', 'usuario', result.insertId, username);
         res.status(201).json({
           message: 'Usuario registrado exitosamente',
           id: result.insertId
@@ -144,12 +147,12 @@ const AuthController = {
       return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
     }
 
     // Obtener usuario actual
-    Usuario.findById(userId, (err, results) => {
+    Usuario.findByIdWithPassword(userId, (err, results) => {
       if (err) {
         return res.status(500).json({ error: 'Error en el servidor' });
       }

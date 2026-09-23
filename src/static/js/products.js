@@ -86,11 +86,11 @@ function displayProducts(products) {
         const categoryName = categoryNames[product.id_categoria] || 'Otra';
         
         card.innerHTML = `
-            <img src="${product.imagen}" alt="${product.nombre}" class="product-image" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
+            <img src="${esc(product.imagen)}" alt="${esc(product.nombre)}" class="product-image" onerror="this.src='https://via.placeholder.com/400?text=No+Image'">
             <div class="product-info">
                 <span class="category-badge" style="background: ${categoryColor}">${categoryName}</span>
-                <h3 class="product-name">${product.nombre}</h3>
-                <div class="product-code">Código: ${product.codigo}</div>
+                <h3 class="product-name">${esc(product.nombre)}</h3>
+                <div class="product-code">Código: ${esc(product.codigo)}</div>
                 <div class="product-price">$${parseFloat(product.precio_venta).toFixed(2)}</div>
                 <div class="product-stock ${stockClass}">
                     Stock: ${product.stock_actual} unidades

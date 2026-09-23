@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const ClienteController = require('../controllers/ClienteController');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+
+const editors = roleMiddleware(['admin', 'gerente', 'supervisor']);
 
 // GET /api/clientes - Obtener todos los clientes
 router.get('/', authMiddleware, ClienteController.getAll);
@@ -19,9 +21,9 @@ router.get('/:id', authMiddleware, ClienteController.getById);
 router.post('/', authMiddleware, ClienteController.create);
 
 // PUT /api/clientes/:id - Actualizar cliente
-router.put('/:id', authMiddleware, ClienteController.update);
+router.put('/:id', authMiddleware, editors, ClienteController.update);
 
 // DELETE /api/clientes/:id - Eliminar cliente
-router.delete('/:id', authMiddleware, ClienteController.delete);
+router.delete('/:id', authMiddleware, editors, ClienteController.delete);
 
 module.exports = router;

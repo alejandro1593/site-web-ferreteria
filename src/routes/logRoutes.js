@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
 // GET /api/logs - Ver auditoría de acciones (solo admin)

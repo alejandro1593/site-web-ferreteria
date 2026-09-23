@@ -1,33 +1,28 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const CajaController = require('../controllers/CajaController');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
-// GET /api/caja - Obtener todas las cajas
-router.get('/', authMiddleware, CajaController.getAll);
+const financeRoles = roleMiddleware(['admin', 'gerente', 'supervisor', 'cajero']);
+const cashRoles = roleMiddleware(['admin', 'gerente', 'supervisor', 'cajero']);
+const sensitiveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: { error: 'Demasiados intentos. Espere 15 minutos' }
+});
 
-// GET /api/caja/abierta - Obtener caja abierta del usuario actual
-router.get('/abierta', authMiddleware, CajaController.getAbierta);
-
-// GET /api/caja/cerradas - Obtener cajas cerradas con filtros
-router.get('/cerradas', authMiddleware, CajaController.getCajasCerradas);
-
-// GET /api/caja/:id - Obtener caja por ID
-router.get('/:id', authMiddleware, CajaController.getById);
-
-// GET /api/caja/:id/ventas - Obtener ventas de una caja
-router.get('/:id/ventas', authMiddleware, CajaController.getVentasCaja);
-
-// GET /api/caja/:id/devoluciones - Obtener devoluciones de una caja
-router.get('/:id/devoluciones', authMiddleware, CajaController.getDevolucionesCaja);
-
-// GET /api/caja/:id/resumen - Obtener resumen completo de una caja
-router.get('/:id/resumen', authMiddleware, CajaController.getResumenCaja);
-
-// POST /api/caja/abrir - Abrir caja
-router.post('/abrir', authMiddleware, CajaController.abrirCaja);
-
-// POST /api/caja/cerrar - Cerrar caja
-router.post('/cerrar', authMiddleware, CajaController.cerrarCaja);
+router.get('/', authMiddleware, financeRoles, CajaController.getAll);
+router.get('/abierta', authMiddleware, cashRoles, CajaController.getAbierta);
+router.get('/cerradas', authMiddleware, financeRoles, CajaController.getCajasCerradas);
+router.get('/:id', authMiddleware, financeRoles, CajaController.getById);
+router.get('/:id/ventas', authMiddleware, financeRoles, CajaController.getVentasCaja);
+router.get('/:id/devoluciones', authMiddleware, financeRoles, CajaController.getDevolucionesCaja);
+router.get('/:id/resumen', authMiddleware, financeRoles, CajaController.getResumenCaja);
+router.post('/abrir', authMiddleware, cashRoles, sensitiveLimiter, CajaController.abrirCaja);
+router.post('/cerrar', authMiddleware, cashRoles, sensitiveLimiter, CajaController.cerrarCaja);
 
 module.exports = router;

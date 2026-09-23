@@ -28,23 +28,34 @@ const CompraController = {
       return res.status(400).json({ error: 'Proveedor y al menos un producto son requeridos' });
     }
 
+    const proveedorId = Number(id_proveedor);
+    if (!Number.isInteger(proveedorId) || proveedorId <= 0) return res.status(400).json({ error: 'Proveedor inválido' });
     for (const p of productos) {
-      if (!p.id_producto || !p.cantidad || p.cantidad <= 0 || !p.precio_costo || p.precio_costo < 0) {
-        return res.status(400).json({ error: 'Cada producto requiere id, cantidad > 0 y precio de costo válido' });
+      const productoId = Number(p.id_producto);
+      const cantidad = Number(p.cantidad);
+      const precio = Number(p.precio_costo);
+      if (!Number.isInteger(productoId) || productoId <= 0 || !Number.isInteger(cantidad) || cantidad <= 0 || !Number.isFinite(precio) || precio < 0) {
+        return res.status(400).json({ error: 'Cada producto requiere id, cantidad entera positiva y precio de costo válido' });
       }
+      p.id_producto = productoId;
+      p.cantidad = cantidad;
+      p.precio_costo = precio;
     }
 
     const total = productos.reduce((sum, p) => sum + p.cantidad * p.precio_costo, 0);
 
     const compraData = {
-      id_proveedor,
+      id_proveedor: proveedorId,
       total,
       observaciones,
       id_usuario: req.user.id_usuario
     };
 
     Compra.create(compraData, productos, (err, idCompra) => {
-      if (err) return res.status(500).json({ error: 'Error al registrar la compra' });
+      if (err) {
+        const status = ['DUPLICATE_PRODUCT', 'PRODUCT_NOT_FOUND'].includes(err.code) ? 400 : 500;
+        return res.status(status).json({ error: status === 400 ? err.message : 'Error al registrar la compra' });
+      }
       registrarAccion(req, 'crear', 'compra', idCompra, `Compra por ${total}`);
       res.status(201).json({ message: 'Compra registrada exitosamente', id: idCompra, total });
     });

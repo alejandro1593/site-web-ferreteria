@@ -1,30 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const VentaDetalle = {
-  // Crear tabla si no existe
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS venta_detalle (
-        id_detalle INT AUTO_INCREMENT PRIMARY KEY,
-        id_venta INT,
-        id_producto INT,
-        cantidad INT NOT NULL,
-        precio_unitario DECIMAL(10,2),
-        subtotal DECIMAL(10,2),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (id_venta) REFERENCES ventas(id_venta) ON DELETE CASCADE,
-        FOREIGN KEY (id_producto) REFERENCES productos(id_producto) ON DELETE RESTRICT
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla venta_detalle:', err);
-      } else {
-        console.log('Tabla venta_detalle verificada/creada');
-      }
-    });
-  },
-
   // Obtener detalles de una venta con información del producto
   findByIdVenta: (idVenta, callback) => {
     const sql = `
@@ -44,7 +20,7 @@ const VentaDetalle = {
   create: (data, callback) => {
     const sql = `
       INSERT INTO venta_detalle (id_venta, id_producto, cantidad, precio_unitario, subtotal) 
-      VALUES (?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?) RETURNING id_detalle
     `;
     connection.query(sql, [
       data.id_venta, 
@@ -157,8 +133,5 @@ const VentaDetalle = {
     connection.query(sql, callback);
   }
 };
-
-// Inicializar tabla
-VentaDetalle.crearTabla();
 
 module.exports = VentaDetalle;

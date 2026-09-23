@@ -28,6 +28,8 @@ logs/
 
 # Backups de base de datos
 backups/
+# Archivos subidos por usuarios
+uploads/
 
 # Test files (temporary)
 test-*.html

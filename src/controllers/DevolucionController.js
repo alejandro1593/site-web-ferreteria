@@ -1,7 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 const Devolucion = require('../models/Devolucion');
-const Venta = require('../models/Venta');
-const Producto = require('../models/Producto');
+const { registrarAccion } = require('../utils/audit');
 
 const DevolucionController = {
   getAll: (req, res) => {
@@ -36,65 +35,107 @@ const DevolucionController = {
     });
   },
 
-  create: (req, res) => {
-    const { id_venta, id_producto, cantidad, motivo, metodo_reembolso, id_usuario } = req.body || {};
-    
-    if (!id_venta || !id_producto || !cantidad) {
-      return res.status(400).json({ error: 'id_venta, id_producto y cantidad son requeridos' });
+  create: async (req, res) => {
+    const idVenta = Number(req.body?.id_venta);
+    const idProducto = Number(req.body?.id_producto);
+    const cantidad = Number(req.body?.cantidad);
+    const motivo = String(req.body?.motivo || 'Devolución de producto').trim().slice(0, 255);
+    const metodo = String(req.body?.metodo_reembolso || '').trim().slice(0, 50);
+
+    if (!Number.isInteger(idVenta) || idVenta <= 0 || !Number.isInteger(idProducto) || idProducto <= 0) {
+      return res.status(400).json({ error: 'id_venta e id_producto deben ser válidos' });
+    }
+    if (!Number.isInteger(cantidad) || cantidad <= 0) {
+      return res.status(400).json({ error: 'La cantidad debe ser un entero mayor a 0' });
     }
 
-    if (cantidad <= 0) {
-      return res.status(400).json({ error: 'La cantidad debe ser mayor a 0' });
-    }
-
-    VerificarVentaProducto(id_venta, id_producto, cantidad, (err, ventaInfo) => {
-      if (err) {
-        return res.status(400).json({ error: err.message });
-      }
-
-      const monto_reembolso = ventaInfo.precio_unitario * cantidad;
-
-      const devolucionData = {
-        id_venta,
-        id_producto,
-        cantidad,
-        motivo: motivo || 'Devolución de producto',
-        monto_reembolso,
-        metodo_reembolso: metodo_reembolso || ventaInfo.metodo_pago,
-        estado: 'completada',
-        id_usuario
-      };
-
-      Devolucion.create(devolucionData, (err, result) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al crear devolución' });
+    try {
+      const resultado = await connection.withTransaction(async (client) => {
+        const ventaResult = await client.query(
+          'SELECT metodo_pago, estado, saldo_pendiente FROM ventas WHERE id_venta = $1 FOR UPDATE',
+          [idVenta]
+        );
+        if (ventaResult.rowCount === 0) {
+          const error = new Error('Venta no encontrada');
+          error.status = 404;
+          throw error;
+        }
+        if (ventaResult.rows[0].estado === 'anulada') {
+          const error = new Error('No se pueden devolver productos de una venta anulada');
+          error.status = 409;
+          throw error;
         }
 
-        Producto.findById(id_producto, (err, productoResult) => {
-          if (!err && productoResult.length > 0) {
-            const nuevoStock = productoResult[0].stock_actual + cantidad;
-            Producto.updateStock(id_producto, nuevoStock, (err) => {
-              if (err) {
-                console.error('Error actualizando stock:', err);
-              }
-            });
-          }
-        });
+        const detalleResult = await client.query(
+          `SELECT COALESCE(SUM(vd.cantidad), 0)::integer as cantidad_vendida,
+                  MAX(vd.precio_unitario) as precio_unitario
+           FROM venta_detalle vd
+           WHERE vd.id_venta = $1 AND vd.id_producto = $2`,
+          [idVenta, idProducto]
+        );
+        if (detalleResult.rowCount === 0 || Number(detalleResult.rows[0].cantidad_vendida) <= 0) {
+          const error = new Error('El producto no se encuentra en la venta especificada');
+          error.status = 400;
+          throw error;
+        }
 
-        res.status(201).json({
-          message: 'Devolución creada exitosamente',
-          id: result.insertId,
-          monto_reembolso
-        });
+        const devolucionesResult = await client.query(
+          `SELECT COALESCE(SUM(cantidad), 0)::integer as cantidad_devuelta
+           FROM devoluciones
+           WHERE id_venta = $1 AND id_producto = $2 AND estado = 'completada'`,
+          [idVenta, idProducto]
+        );
+        const cantidadDevuelta = Number(devolucionesResult.rows[0].cantidad_devuelta);
+        const cantidadVendida = Number(detalleResult.rows[0].cantidad_vendida);
+        if (cantidad + cantidadDevuelta > cantidadVendida) {
+          const error = new Error('La cantidad supera lo vendido o ya devuelto');
+          error.status = 409;
+          throw error;
+        }
+
+        const precioUnitario = Number(detalleResult.rows[0].precio_unitario);
+        const montoReembolso = Math.round(precioUnitario * 100) * cantidad / 100;
+        const metodoReembolso = metodo || ventaResult.rows[0].metodo_pago;
+        const devolucionResult = await client.query(
+          `INSERT INTO devoluciones (id_venta, id_producto, cantidad, motivo, monto_reembolso, metodo_reembolso, estado, id_usuario)
+           VALUES ($1, $2, $3, $4, $5, $6, 'completada', $7)
+           RETURNING id_devolucion`,
+          [idVenta, idProducto, cantidad, motivo, montoReembolso, metodoReembolso, req.user.id_usuario || null]
+        );
+
+        await client.query(
+          'UPDATE productos SET stock_actual = stock_actual + $1 WHERE id_producto = $2',
+          [cantidad, idProducto]
+        );
+
+        if (ventaResult.rows[0].metodo_pago === 'credito' && Number(ventaResult.rows[0].saldo_pendiente) > 0) {
+          const nuevoSaldo = Math.max(Number(ventaResult.rows[0].saldo_pendiente) - montoReembolso, 0);
+          await client.query(
+            'UPDATE ventas SET saldo_pendiente = $1, estado = $2 WHERE id_venta = $3',
+            [nuevoSaldo, nuevoSaldo === 0 ? 'completada' : 'pendiente', idVenta]
+          );
+        }
+
+        return { id: devolucionResult.rows[0].id_devolucion, monto_reembolso: montoReembolso };
       });
-    });
+
+      registrarAccion(req, 'crear', 'devolucion', resultado.id, `Monto ${resultado.monto_reembolso}`);
+      res.status(201).json({
+        message: 'Devolución creada exitosamente',
+        id: resultado.id,
+        monto_reembolso: resultado.monto_reembolso
+      });
+    } catch (error) {
+      const status = error.status || 500;
+      res.status(status).json({ error: status === 500 ? 'Error al crear devolución' : error.message });
+    }
   },
 
   getDevolucionesPorPeriodo: (req, res) => {
     const { fechaInicio, fechaFin } = req.query;
     
     const hoy = new Date();
-    const inicio = fechaInicio || `${hoy.getFullYear()}-${hoy.getMonth() + 1}-01`;
+     const inicio = fechaInicio || `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`;
     const fin = fechaFin || hoy.toISOString().split('T')[0];
 
     Devolucion.getDevolucionesPorPeriodo(inicio, fin, (err, results) => {
@@ -107,8 +148,11 @@ const DevolucionController = {
 
   getResumen: (req, res) => {
     const { fechaInicio, fechaFin } = req.query;
+    const query = fechaInicio && fechaFin
+      ? Devolucion.getResumenDevoluciones.bind(Devolucion, fechaInicio, fechaFin)
+      : Devolucion.getResumenDevolucionesSinFiltros.bind(Devolucion);
 
-    Devolucion.getResumenDevolucionesSinFiltros((err, results) => {
+    query((err, results) => {
       if (err) {
         return res.status(500).json({ error: 'Error al obtener resumen de devoluciones' });
       }
@@ -120,31 +164,5 @@ const DevolucionController = {
     });
   }
 };
-
-function VerificarVentaProducto(idVenta, idProducto, cantidad, callback) {
-  const sql = `
-    SELECT vd.precio_unitario, v.metodo_pago
-    FROM venta_detalle vd
-    JOIN ventas v ON vd.id_venta = v.id_venta
-    WHERE vd.id_venta = ? AND vd.id_producto = ?
-  `;
-
-  connection.query(sql, [idVenta, idProducto], (err, results) => {
-    if (err) {
-      return callback(err);
-    }
-    
-    if (results.length === 0) {
-      return callback(new Error('El producto no se encuentra en la venta especificada'));
-    }
-
-    const ventaInfo = {
-      precio_unitario: results[0].precio_unitario,
-      metodo_pago: results[0].metodo_pago
-    };
-
-    callback(null, ventaInfo);
-  });
-}
 
 module.exports = DevolucionController;

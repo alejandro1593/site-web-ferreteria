@@ -3,16 +3,13 @@ let usuarios = [];
 
 async function verificarEstadoCaja() {
     try {
-        const cajeroSelect = document.getElementById('cajero-select');
-        const selectedCajero = cajeroSelect.value;
-        
-        if (!selectedCajero) {
+        const usuario = getCurrentUser();
+        if (!usuario) {
             mostrarCajaCerrada();
             return;
         }
-        
-        const caja = await fetchAPIAuth(`/caja/abierta?id_usuario=${selectedCajero}`);
-        
+        usuarios = [usuario];
+        const caja = await fetchAPIAuth('/caja/abierta');
         if (caja) {
             cajaAbierta = caja;
             mostrarCajaAbierta(caja);
@@ -20,31 +17,18 @@ async function verificarEstadoCaja() {
         } else {
             mostrarCajaCerrada();
         }
-        
     } catch (error) {
-        console.error('Error verificando estado de caja:', error);
         mostrarCajaCerrada();
     }
 }
 
 async function cargarUsuarios() {
-    try {
-        usuarios = await fetchAPIAuth('/usuarios');
-        
-        const cajeros = usuarios.filter(u => u.rol === 'cajero' || u.rol === 'admin' || u.rol === 'gerente' || u.rol === 'supervisor');
-        
-        const selectOptions = '<option value="">Seleccionar cajero...</option>' +
-            cajeros.map(usuario => `
-                <option value="${usuario.id_usuario}">${usuario.nombre} (${usuario.rol})</option>
-            `).join('');
-        
-        document.getElementById('cajero-select').innerHTML = selectOptions;
-        document.getElementById('cajero-cierre-select').innerHTML = selectOptions;
-        
-    } catch (error) {
-        console.error('Error cargando usuarios:', error);
-        showNotification('Error al cargar usuarios', 'error');
-    }
+    const usuario = getCurrentUser();
+    if (!usuario) return;
+    usuarios = [usuario];
+    const option = `<option value="${usuario.id_usuario}">${esc(usuario.nombre)} (${esc(usuario.rol)})</option>`;
+    document.getElementById('cajero-select').innerHTML = option;
+    document.getElementById('cajero-cierre-select').innerHTML = option;
 }
 
 function mostrarCajaCerrada() {
@@ -67,15 +51,13 @@ function mostrarCajaAbierta(caja) {
 }
 
 async function abrirCaja() {
-    const idUsuario = document.getElementById('cajero-select').value;
+    const usuario = getCurrentUser();
     const password = document.getElementById('password-cajero').value;
     const montoApertura = parseFloat(document.getElementById('monto-apertura').value) || 0;
     const observaciones = document.getElementById('observaciones-apertura').value;
-    
-    console.log('💰 Intentando abrir caja con usuario:', idUsuario);
-    
-    if (!idUsuario) {
-        showNotification('Por favor seleccione un cajero', 'error');
+
+    if (!usuario) {
+        showNotification('Sesión no válida', 'error');
         return;
     }
     
@@ -91,7 +73,6 @@ async function abrirCaja() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                id_usuario: parseInt(idUsuario),
                 password,
                 monto_apertura: montoApertura,
                 observaciones
@@ -128,16 +109,9 @@ async function mostrarModalCierre() {
         
         const montoApertura = parseFloat(cajaAbierta.monto_apertura) || 0;
         const totalVentas = parseFloat(resumen.resumen?.total_ventas) || 0;
+        const totalAbonos = parseFloat(resumen.resumen?.total_abonos) || 0;
         const totalDevoluciones = parseFloat(resumen.resumen?.total_devoluciones) || 0;
-        
-        const montoEsperado = montoApertura + totalVentas - totalDevoluciones;
-        
-        console.log('💰 Cálculo de monto esperado:', {
-            montoApertura,
-            totalVentas,
-            totalDevoluciones,
-            montoEsperado
-        });
+        const montoEsperado = montoApertura + totalVentas + totalAbonos - totalDevoluciones;
         
         document.getElementById('monto-esperado').textContent = formatCurrency(montoEsperado);
         document.getElementById('previo-cierre').style.display = 'block';
@@ -156,15 +130,13 @@ async function mostrarModalCierre() {
 }
 
 async function cerrarCaja() {
-    const idUsuario = document.getElementById('cajero-cierre-select').value;
+    const usuario = getCurrentUser();
     const password = document.getElementById('password-cierre').value;
     const montoCierre = parseFloat(document.getElementById('monto-cierre').value);
     const observaciones = document.getElementById('observaciones-cierre').value;
-    
-    console.log('🔒 Intentando cerrar caja:', { idUsuario, montoCierre, observaciones });
-    
-    if (!idUsuario) {
-        showNotification('Por favor seleccione un cajero', 'error');
+
+    if (!usuario) {
+        showNotification('Sesión no válida', 'error');
         return;
     }
     
@@ -186,7 +158,6 @@ async function cerrarCaja() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                id_usuario: parseInt(idUsuario),
                 password,
                 monto_cierre: montoCierre,
                 observaciones
@@ -235,7 +206,7 @@ async function cargarResumenCaja(idCaja) {
             </div>
             <div class="stat-card">
                 <h3>💰 Ingreso Neto</h3>
-                <div class="value">${formatCurrency((resumen.resumen?.total_ventas || 0) - (resumen.resumen?.total_devoluciones || 0))}</div>
+                <div class="value">${formatCurrency((resumen.resumen?.total_ventas || 0) + (resumen.resumen?.total_abonos || 0) - (resumen.resumen?.total_devoluciones || 0))}</div>
                 <div class="trend">
                     Ventas - Devoluciones
                 </div>
@@ -256,11 +227,11 @@ async function cargarResumenCaja(idCaja) {
                 <div>
                     <h4>Información General</h4>
                     <div style="margin-top: 10px;">
-                        <p><strong>Usuario:</strong> ${resumen.usuario_nombre}</p>
+                        <p><strong>Usuario:</strong> ${esc(resumen.usuario_nombre)}</p>
                         <p><strong>Fecha Apertura:</strong> ${formatDateTime(resumen.fecha_apertura)}</p>
                         <p><strong>Fecha Cierre:</strong> ${resumen.fecha_cierre ? formatDateTime(resumen.fecha_cierre) : 'En curso'}</p>
                         <p><strong>Monto Apertura:</strong> ${formatCurrency(resumen.monto_apertura || 0)}</p>
-                        <p><strong>Estado:</strong> ${resumen.estado}</p>
+                        <p><strong>Estado:</strong> ${esc(resumen.estado)}</p>
                     </div>
                 </div>
                 <div>
@@ -268,7 +239,7 @@ async function cargarResumenCaja(idCaja) {
                     <div style="margin-top: 10px;">
                         <p><strong>Ventas:</strong> ${formatCurrency(resumen.resumen?.total_ventas || 0)}</p>
                         <p><strong>Devoluciones:</strong> ${formatCurrency(resumen.resumen?.total_devoluciones || 0)}</p>
-                        <p><strong>Ingreso Neto:</strong> ${formatCurrency((resumen.resumen?.total_ventas || 0) - (resumen.resumen?.total_devoluciones || 0))}</p>
+                        <p><strong>Ingreso Neto:</strong> ${formatCurrency((resumen.resumen?.total_ventas || 0) + (resumen.resumen?.total_abonos || 0) - (resumen.resumen?.total_devoluciones || 0))}</p>
                         ${resumen.fecha_cierre ? `
                             <p><strong>Monto Cierre:</strong> ${formatCurrency(resumen.monto_cierre || 0)}</p>
                             <p><strong>Diferencia:</strong> <span style="color: ${resumen.diferencia >= 0 ? 'green' : 'red'}">${formatCurrency(resumen.diferencia || 0)}</span></p>
@@ -313,7 +284,7 @@ async function loadCajas() {
             return `
                 <tr>
                     <td>#${caja.id_caja}</td>
-                    <td>${caja.usuario_nombre}</td>
+                    <td>${esc(caja.usuario_nombre)}</td>
                     <td>${formatDateTime(caja.fecha_apertura)}</td>
                     <td>${caja.fecha_cierre ? formatDateTime(caja.fecha_cierre) : 'En curso'}</td>
                     <td>${formatCurrency(caja.monto_apertura || 0)}</td>
@@ -321,7 +292,7 @@ async function loadCajas() {
                     <td style="color: ${diferenciaColor}; font-weight: bold;">${formatCurrency(diferencia)}</td>
                     <td>
                         <span class="status-badge status-${caja.estado === 'abierta' ? 'active' : 'pending'}">
-                            ${caja.estado}
+                            ${esc(caja.estado)}
                         </span>
                     </td>
                     <td class="text-center">
@@ -353,10 +324,10 @@ async function verDetallesCaja(idCaja) {
             <div style="margin-bottom: 20px;">
                 <h4>📊 Resumen de Caja #${resumen.id_caja}</h4>
                 <div style="margin-top: 10px; padding: 15px; background: #f0f0f0; border-radius: 5px;">
-                    <p><strong>Usuario:</strong> ${resumen.usuario_nombre}</p>
+                    <p><strong>Usuario:</strong> ${esc(resumen.usuario_nombre)}</p>
                     <p><strong>Apertura:</strong> ${formatDateTime(resumen.fecha_apertura)}</p>
                     <p><strong>Cierre:</strong> ${resumen.fecha_cierre ? formatDateTime(resumen.fecha_cierre) : 'En curso'}</p>
-                    <p><strong>Estado:</strong> ${resumen.estado}</p>
+                    <p><strong>Estado:</strong> ${esc(resumen.estado)}</p>
                     <p><strong>Ventas:</strong> ${formatCurrency(resumen.resumen?.total_ventas || 0)}</p>
                     <p><strong>Devoluciones:</strong> ${formatCurrency(resumen.resumen?.total_devoluciones || 0)}</p>
                     <p><strong>Monto Apertura:</strong> ${formatCurrency(resumen.monto_apertura || 0)}</p>
@@ -398,5 +369,6 @@ document.getElementById('cajero-select').addEventListener('change', verificarEst
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarUsuarios();
+    verificarEstadoCaja();
     loadCajas();
 });

@@ -65,7 +65,7 @@ async function loadVentas() {
         const select = document.getElementById('venta-select');
         select.innerHTML = '<option value="">Seleccionar venta...</option>' +
             ventas.map(venta => `
-                <option value="${venta.id_venta}">#${venta.id_venta} - ${venta.cliente_nombre || 'Sin cliente'} (${formatDate(venta.fecha)})</option>
+                <option value="${venta.id_venta}">#${venta.id_venta} - ${esc(venta.cliente_nombre) || 'Sin cliente'} (${formatDate(venta.fecha)})</option>
             `).join('');
         
     } catch (error) {
@@ -91,7 +91,7 @@ async function cargarDetallesVenta() {
         productoSelect.innerHTML = '<option value="">Seleccionar producto...</option>' +
             detalles.map(detalle => `
                 <option value="${detalle.id_producto}" data-precio="${detalle.precio_unitario}" data-max="${detalle.cantidad}">
-                    ${detalle.producto_nombre} (Stock: ${detalle.cantidad} | Precio: ${formatCurrency(detalle.precio_unitario)})
+                    ${esc(detalle.producto_nombre)} (Stock: ${detalle.cantidad} | Precio: ${formatCurrency(detalle.precio_unitario)})
                 </option>
             `).join('');
         
@@ -138,7 +138,7 @@ async function procesarDevolucion() {
         return;
     }
     
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    const userInfo = JSON.parse(localStorage.getItem('usuario') || '{}');
     
     try {
         const response = await fetchAPIAuth('/devoluciones', {
@@ -203,12 +203,12 @@ async function loadDevoluciones() {
                 <td>#${devolucion.id_devolucion}</td>
                 <td>${formatDate(devolucion.fecha)}</td>
                 <td>#${devolucion.id_venta}</td>
-                <td>${devolucion.id_cliente ? '#' + devolucion.id_cliente : ''} ${devolucion.cliente_nombre || 'Sin cliente'}</td>
-                <td>${devolucion.producto_nombre}</td>
+                <td>${devolucion.id_cliente ? '#' + devolucion.id_cliente : ''} ${esc(devolucion.cliente_nombre) || 'Sin cliente'}</td>
+                <td>${esc(devolucion.producto_nombre)}</td>
                 <td>${devolucion.cantidad}</td>
                 <td><strong>${formatCurrency(monto)}</strong></td>
-                <td>${devolucion.metodo_reembolso}</td>
-                <td>${devolucion.motivo || '-'}</td>
+                <td>${esc(devolucion.metodo_reembolso)}</td>
+                <td>${esc(devolucion.motivo) || '-'}</td>
             </tr>
         `;
         }).join('');
@@ -218,7 +218,7 @@ async function loadDevoluciones() {
         document.getElementById('devoluciones-tbody').innerHTML = `
             <tr>
                 <td colspan="9" class="alert alert-danger">
-                    Error al cargar devoluciones: ${error.message}
+                    Error al cargar devoluciones: ${esc(error.message)}
                 </td>
             </tr>
         `;

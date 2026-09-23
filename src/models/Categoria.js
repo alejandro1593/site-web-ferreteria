@@ -1,26 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Categoria = {
-  // Crear tabla si no existe
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS categorias (
-        id_categoria INT AUTO_INCREMENT PRIMARY KEY,
-        nombre VARCHAR(100) NOT NULL UNIQUE,
-        descripcion TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla categorias:', err);
-      } else {
-        console.log('Tabla categorias verificada/creada');
-      }
-    });
-  },
-
   // Obtener todas las categorías
   findAll: (callback) => {
     const sql = 'SELECT * FROM categorias ORDER BY nombre ASC';
@@ -35,7 +15,7 @@ const Categoria = {
 
   // Crear nueva categoría
   create: (data, callback) => {
-    const sql = 'INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)';
+    const sql = 'INSERT INTO categorias (nombre, descripcion) VALUES (?, ?) RETURNING id_categoria';
     connection.query(sql, [data.nombre, data.descripcion], callback);
   },
 
@@ -51,8 +31,5 @@ const Categoria = {
     connection.query(sql, [id], callback);
   }
 };
-
-// Inicializar tabla
-Categoria.crearTabla();
 
 module.exports = Categoria;

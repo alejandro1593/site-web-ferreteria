@@ -6,7 +6,7 @@ async function cargarUsuarios() {
         
         const selectHTML = '<option value="">Todos</option>' +
             usuarios.map(usuario => `
-                <option value="${usuario.id_usuario}">${usuario.nombre} (${usuario.rol})</option>
+                <option value="${usuario.id_usuario}">${esc(usuario.nombre)} (${esc(usuario.rol)})</option>
             `).join('');
         
         document.getElementById('usuario-filter').innerHTML = selectHTML;
@@ -61,7 +61,7 @@ async function loadCajasCerradas() {
                 <tr>
                     <td>#${caja.id_caja}</td>
                     <td>
-                        <strong>${caja.usuario_nombre}</strong><br>
+                        <strong>${esc(caja.usuario_nombre)}</strong><br>
                         <small>ID: ${caja.id_usuario}</small>
                     </td>
                     <td>${formatDateTime(caja.fecha_apertura)}</td>
@@ -72,7 +72,7 @@ async function loadCajasCerradas() {
                     <td style="color: ${diferenciaColor}; font-weight: bold;">${formatCurrency(diferencia)}</td>
                     <td>
                         <span class="status-badge status-active">
-                            ${caja.estado}
+                            ${esc(caja.estado)}
                         </span>
                     </td>
                     <td class="text-center">
@@ -114,10 +114,10 @@ async function verDetallesCaja(idCaja) {
                             <p><strong>ID:</strong> #${resumen.id_caja}</p>
                             <p><strong>Usuario:</strong> ${nombreUsuario}</p>
                             <p><strong>ID Usuario:</strong> ${resumen.id_usuario}</p>
-                            <p><strong>Estado:</strong> ${resumen.estado}</p>
+                             <p><strong>Estado:</strong> ${esc(resumen.estado)}</p>
                             <p><strong>Fecha Apertura:</strong> ${formatDateTime(resumen.fecha_apertura)}</p>
                             <p><strong>Fecha Cierre:</strong> ${formatDateTime(resumen.fecha_cierre)}</p>
-                            <p><strong>Observaciones:</strong> ${resumen.observaciones || 'Sin observaciones'}</p>
+                                <p><strong>Observaciones:</strong> ${esc(resumen.observaciones) || 'Sin observaciones'}</p>
                         </div>
                     </div>
                     <div>

@@ -1,34 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Cotizacion = {
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS cotizaciones (
-        id_cotizacion INT AUTO_INCREMENT PRIMARY KEY,
-        id_cliente INT,
-        fecha_emision DATETIME DEFAULT CURRENT_TIMESTAMP,
-        fecha_validez DATE,
-        subtotal DECIMAL(10,2),
-        iva DECIMAL(10,2),
-        descuento DECIMAL(10,2) DEFAULT 0,
-        total DECIMAL(10,2),
-        estado VARCHAR(20) DEFAULT 'pendiente',
-        observaciones TEXT,
-        id_usuario INT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON DELETE SET NULL,
-        FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE SET NULL
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla cotizaciones:', err);
-      } else {
-        console.log('Tabla cotizaciones verificada/creada');
-      }
-    });
-  },
-
   findAll: (callback) => {
     const sql = `
       SELECT c.*, 
@@ -121,7 +93,7 @@ const Cotizacion = {
         estado, 
         observaciones, 
         id_usuario
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id_cotizacion
     `;
     connection.query(sql, [
       data.id_cliente || null,
@@ -174,12 +146,12 @@ const Cotizacion = {
     }
 
     values.push(id);
-    const sql = `UPDATE cotizaciones SET ${updates.join(', ')} WHERE id_cotizacion = ?`;
+    const sql = `UPDATE cotizaciones SET ${updates.join(', ')} WHERE id_cotizacion = ? AND estado <> 'convertida'`;
     connection.query(sql, values, callback);
   },
 
   delete: (id, callback) => {
-    const sql = 'DELETE FROM cotizaciones WHERE id_cotizacion = ?';
+    const sql = "DELETE FROM cotizaciones WHERE id_cotizacion = ? AND estado <> 'convertida'";
     connection.query(sql, [id], callback);
   },
 
@@ -199,7 +171,7 @@ const Cotizacion = {
     const values = [];
     
     if (fechaInicio && fechaFin) {
-      sql += ' WHERE fecha_emision BETWEEN ? AND ?';
+      sql += ' WHERE fecha_emision >= CAST(? AS date) AND fecha_emision < CAST(? AS date) + INTERVAL \'1 day\'';
       values.push(fechaInicio, fechaFin);
     }
     
@@ -207,5 +179,4 @@ const Cotizacion = {
   }
 };
 
-Cotizacion.crearTabla();
 module.exports = Cotizacion;

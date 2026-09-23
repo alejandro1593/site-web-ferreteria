@@ -11,17 +11,17 @@ async function loadCategoriasYProveedores() {
         // Llenar select de categorías
         const categoriaSelect = document.getElementById('producto-categoria');
         categoriaSelect.innerHTML = '<option value="">Seleccionar...</option>' +
-            categorias.map(cat => `<option value="${cat.id_categoria}">${cat.nombre}</option>`).join('');
+            categorias.map(cat => `<option value="${cat.id_categoria}">${esc(cat.nombre)}</option>`).join('');
 
         // Llenar select de categorías para filtro
         const filterCategoriaSelect = document.getElementById('filter-categoria');
         filterCategoriaSelect.innerHTML = '<option value="">Todas las categorías</option>' +
-            categorias.map(cat => `<option value="${cat.id_categoria}">${cat.nombre}</option>`).join('');
+            categorias.map(cat => `<option value="${cat.id_categoria}">${esc(cat.nombre)}</option>`).join('');
 
         // Llenar select de proveedores
         const proveedorSelect = document.getElementById('producto-proveedor');
         proveedorSelect.innerHTML = '<option value="">Seleccionar...</option>' +
-            proveedores.map(prov => `<option value="${prov.id_proveedor}">${prov.nombre}</option>`).join('');
+            proveedores.map(prov => `<option value="${prov.id_proveedor}">${esc(prov.nombre)}</option>`).join('');
 
     } catch (error) {
         console.error('Error cargando categorías y proveedores:', error);
@@ -212,7 +212,7 @@ function previewImage() {
             
             // Mostrar nombre del archivo
             const fileName = file.name;
-            fileInfo.innerHTML = `Se guardará como: <span id="nombre-archivo">${fileName}</span>`;
+            fileInfo.innerHTML = `Se guardará como: <span id="nombre-archivo">${esc(fileName)}</span>`;
             fileInfo.style.display = 'block';
             
             // Leer archivo y previsualizar
@@ -321,15 +321,16 @@ async function editProducto(id) {
 // Actualizar stock
 async function updateStock(id) {
     const nuevoStock = prompt('Ingrese el nuevo stock:');
+    const motivo = prompt('Ingrese el motivo del ajuste:');
 
-    if (nuevoStock === null || nuevoStock.trim() === '') {
+    if (nuevoStock === null || nuevoStock.trim() === '' || motivo === null || motivo.trim() === '') {
         return;
     }
 
     try {
         await fetchAPIAuth(`/productos/${id}/stock`, {
             method: 'PUT',
-            body: { cantidad: parseInt(nuevoStock) }
+            body: { cantidad: Number(nuevoStock), motivo: motivo.trim() }
         });
 
         showNotification('Stock actualizado exitosamente', 'success');
@@ -412,45 +413,41 @@ async function saveProducto() {
 
     // Manejar imagen según el tipo seleccionado
     if (tipoImagen === 'archivo' && imagenArchivo.files && imagenArchivo.files[0]) {
-        // Subir archivo y crear producto
-        console.log('📤 Subiendo producto con archivo...');
         const formData = new FormData();
         formData.append('imagen', imagenArchivo.files[0]);
-        formData.append('nombre', nombre);
-        formData.append('codigo', codigo);
-        formData.append('descripcion', descripcion);
-        formData.append('precio_compra', precioCompra);
-        formData.append('precio_venta', precioVenta);
-        formData.append('stock_actual', stockActual);
-        formData.append('stock_minimo', stockMinimo);
-        formData.append('id_categoria', categoria);
-        formData.append('id_proveedor', proveedor);
-        formData.append('activo', activo);
+        if (!id) {
+            formData.append('nombre', nombre);
+            formData.append('codigo', codigo);
+            formData.append('descripcion', descripcion);
+            formData.append('precio_compra', precioCompra);
+            formData.append('precio_venta', precioVenta);
+            formData.append('stock_actual', stockActual);
+            formData.append('stock_minimo', stockMinimo);
+            formData.append('id_categoria', categoria);
+            formData.append('id_proveedor', proveedor);
+            formData.append('activo', activo);
+        }
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('/api/productos/upload', {
+            const endpoint = id ? `/api/productos/${id}/upload` : '/api/productos/upload';
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {},
                 body: formData
             });
 
-            console.log('📡 Response status:', response.status);
-
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || errorData.message || 'Error al crear producto');
+                throw new Error(errorData.error || errorData.message || 'Error al procesar la imagen');
             }
 
             const result = await response.json();
-
-            showNotification(result.message || 'Producto creado exitosamente', 'success');
+            showNotification(result.message || (id ? 'Imagen actualizada exitosamente' : 'Producto creado exitosamente'), 'success');
             closeModal('producto-modal');
             await loadProductos();
-
         } catch (error) {
-            console.error('❌ Error creando producto con imagen:', error);
-            showNotification(error.message || 'Error al crear el producto', 'error');
+            showNotification(error.message || 'Error al procesar la imagen', 'error');
         }
     } else {
         try {

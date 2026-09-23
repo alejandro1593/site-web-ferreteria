@@ -11,7 +11,7 @@ async function loadClientes() {
         clienteSelect.innerHTML = '<option value="">Sin cliente</option>' +
             clientes.map(cli =>
                 `<option value="${cli.id_cliente}">
-                    ${cli.nombre} ${cli.apellido} - ${cli.dni}
+                    ${esc(cli.nombre)} ${esc(cli.apellido)} - ${esc(cli.dni)}
                 </option>`
             ).join('');
 
@@ -51,7 +51,7 @@ function renderProductosPOS(data) {
     
     container.innerHTML = data.map(producto => `
         <div class="product-option" onclick="agregarAlCarrito(${producto.id_producto})">
-            <div class="product-option-name">${producto.nombre}</div>
+            <div class="product-option-name">${esc(producto.nombre)}</div>
             <div class="product-option-price">$${parseFloat(producto.precio_venta).toFixed(2)}</div>
             <div class="product-option-stock">
                 Stock: ${producto.stock_actual}
@@ -160,7 +160,7 @@ function renderCarrito() {
         container.innerHTML = carrito.map((item, index) => `
             <div class="cart-item">
                 <div class="cart-item-header">
-                    <span class="cart-item-name">${item.nombre}</span>
+                    <span class="cart-item-name">${esc(item.nombre)}</span>
                     <span class="cart-item-price">
                         $${(item.precio_venta * item.cantidad).toFixed(2)}
                     </span>

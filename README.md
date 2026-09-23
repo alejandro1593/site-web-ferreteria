@@ -24,8 +24,8 @@ ganancias y auditoría de acciones.
 ## 🧰 Tecnologías
 
 - **Backend:** Node.js + Express 5
-- **Base de datos:** MySQL (mysql2)
-- **Autenticación:** JWT (jsonwebtoken) + bcrypt
+- **Base de datos:** PostgreSQL (pg) con pool de conexiones
+- **Autenticación:** JWT (jsonwebtoken) + bcryptjs
 - **Seguridad:** helmet, express-rate-limit
 - **Frontend:** HTML/CSS/JS vanilla (sin framework), jsPDF para PDFs
 - **Testing:** Jest + Supertest
@@ -33,8 +33,8 @@ ganancias y auditoría de acciones.
 ## 📋 Requisitos previos
 
 - [Node.js](https://nodejs.org) v18 o superior
-- [MySQL](https://www.mysql.com) corriendo localmente (o [XAMPP](https://www.apachefriends.org))
-- La base de datos `db_ferreteria` importada (dump SQL del proyecto)
+- [PostgreSQL](https://www.postgresql.org/) 14 o superior, o una base Neon PostgreSQL
+- La base de datos migrada y el esquema aplicado
 
 ## ⚙️ Instalación
 
@@ -42,10 +42,11 @@ ganancias y auditoría de acciones.
 # 1. Instalar dependencias
 npm install
 
-# 2. Crear el archivo .env en la raíz (ver sección siguiente)
+# 2. Copiar la configuración de ejemplo y completar DATABASE_URL
+cp .env.example .env
 
-# 3. Ejecutar la migración (crea tablas faltantes y columnas nuevas)
-npm run migrate
+# 3. Aplicar el esquema PostgreSQL
+npm run migrate:postgres
 
 # 4. Iniciar en modo desarrollo
 npm run dev
@@ -56,18 +57,19 @@ El sistema queda disponible en `http://localhost:3000`
 ### Variables de entorno (`.env`)
 
 ```env
-# Database Configuration
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=tu_contraseña_mysql
-DB_NAME=db_ferreteria
+# PostgreSQL / Neon
+DATABASE_URL=postgresql://usuario:password@host:5432/db_ferreteria?sslmode=verify-full
+DB_POOL_MAX=10
+DB_CONNECTION_TIMEOUT_MS=10000
+DB_IDLE_TIMEOUT_MS=30000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 # Server Configuration
 PORT=3000
 
 # JWT Configuration
 JWT_SECRET=cadena_aleatoria_larga_y_secreta
-JWT_EXPIRES_IN=24h
+JWT_EXPIRES_IN=8h
 ```
 
 > 💡 Para generar un `JWT_SECRET` seguro:
@@ -81,9 +83,12 @@ JWT_EXPIRES_IN=24h
 |---|---|
 | `npm run dev` | Servidor de desarrollo con recarga automática (nodemon) |
 | `npm start` | Servidor en producción |
-| `npm test` | Ejecuta los tests de seguridad (requiere MySQL corriendo) |
-| `npm run migrate` | Migración idempotente de la base de datos |
-| `npm run backup` | Backup de la BD a `backups/` (borra respaldos >30 días) |
+| `npm run migrate:postgres` | Aplica el esquema PostgreSQL versionado |
+| `npm run import:mysql -- <archivo.sql>` | Importa un dump MariaDB/MySQL en una base PostgreSQL vacía; exige asociaciones de ventas y bloquea el destino durante la carga |
+| `npm run import:mysql:dry-run -- <archivo.sql>` | Valida el dump sin escribir en PostgreSQL |
+| `npm test` | Ejecuta los tests contra `TEST_DATABASE_URL` |
+| `npm run lint` | Verifica la sintaxis de todos los archivos JavaScript |
+| `npm run backup` | Genera un respaldo local de PostgreSQL |
 
 ## 📁 Estructura del proyecto
 
@@ -91,7 +96,7 @@ JWT_EXPIRES_IN=24h
 ├── src/
 │   ├── app.js                  # Servidor Express (helmet, rate-limit, rutas)
 │   ├── config/
-│   │   └── db_mysql.js         # Conexión MySQL (pool compartido)
+│   │   └── db_postgres.js      # Pool PostgreSQL y transacciones
 │   ├── models/                 # Consultas SQL (Producto, Venta, Compra, Ajuste...)
 │   ├── controllers/            # Lógica de negocio por módulo
 │   ├── routes/                 # Endpoints API + index.js que los monta
@@ -101,8 +106,10 @@ JWT_EXPIRES_IN=24h
 │   ├── views/                  # Interfaces HTML
 │   └── static/js/              # JavaScript del frontend por vista
 ├── scripts/
-│   ├── migracion_v2.js         # Migración de BD (idempotente)
-│   ├── backup_db.js            # Backup automático con mysqldump
+│   ├── postgres_schema.js      # Esquema PostgreSQL versionado
+│   ├── import_mysql_dump.js    # Importador controlado MariaDB/MySQL → PostgreSQL
+│   ├── migracion_v2.js         # Alias compatible de la migración PostgreSQL
+│   ├── backup_db.js            # Respaldo local de PostgreSQL
 │   ├── rotar_passwords.js      # Rotación masiva de claves (gitignored)
 │   └── auditar_accesos.js      # Auditoría de cuentas (gitignored)
 └── tests/
@@ -117,18 +124,20 @@ JWT_EXPIRES_IN=24h
 | `gerente` | Casi todo; sin gestión de usuarios ni logs |
 | `supervisor` / `cajero` / `vendedor` / `almacen` | Operaciones según módulo |
 
-Las escrituras críticas (crear/editar/eliminar productos, ventas, usuarios,
-compras) requieren token con rol `admin` o `gerente`. El registro de usuarios es
-privado (solo un admin autenticado puede crear cuentas).
+Las escrituras de productos, compras, usuarios y eliminación de ventas requieren
+un rol autorizado. Las ventas, clientes, cotizaciones y devoluciones operativas
+se validan también en el backend. El registro de usuarios es privado (solo un
+admin autenticado puede crear cuentas).
 
 ## 🛡️ Seguridad implementada
 
-- Contraseñas hasheadas con **bcrypt**
-- Tokens **JWT** firmados con secreto rotable
+- Contraseñas hasheadas con **bcryptjs**
+- Tokens **JWT** firmados y revocados mediante `token_version`
 - **Rate limiting**: login máx. 10 intentos/15 min · API 300 req/min
-- **Helmet** para cabeceras HTTP seguras
-- Sanitización anti-XSS en todas las vistas
+- **Helmet** y CSPbasic para cabeceras HTTP seguras
+- Sanitización anti-XSS en las vistas
 - Control de roles por endpoint (no confía en el cliente)
+- Transacciones y bloqueos de inventario para ventas, compras, caja y devoluciones
 - Auditoría de operaciones sensibles (`log_acciones`)
 - Tests automatizados de escalada de privilegios y acceso
 
@@ -147,9 +156,8 @@ node scripts/rotar_passwords.js   # genera claves fuertes nuevas para todos
 npm run backup
 ```
 
-Genera `backups/backup_AAAA-MM-DD-HH-MM-SS.sql` usando `mysqldump`
-(auto-detectado en XAMPP). Se recomienda programarlo diariamente y guardar una
-copia fuera de la máquina.
+Genera un respaldo local usando la configuración `DATABASE_URL`. Los respaldos
+contienen datos personales y deben guardarse cifrados y fuera del repositorio.
 
 ## 🧪 Tests
 
@@ -158,5 +166,6 @@ npm test
 ```
 
 Los tests crean sus propias cuentas efímeras (`test_admin_seg`,
-`test_vendedor_seg`) y las eliminan al terminar — no tocan usuarios reales.
-Requieren MySQL corriendo con la BD migrada.
+`test_vendedor_seg`) y las eliminan al terminar.
+Requieren `TEST_DATABASE_URL` apuntando a una base PostgreSQL cuyo nombre incluya
+`test` y distinta de `DATABASE_URL`; nunca deben apuntar a producción.

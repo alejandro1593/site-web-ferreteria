@@ -78,7 +78,7 @@ async function loadRecentSales() {
                 <td>${formatDate(venta.fecha)}</td>
                 <td>
                     <span class="status-badge status-${venta.estado === 'completada' ? 'active' : 'pending'}">
-                        ${venta.estado}
+                        ${esc(venta.estado)}
                     </span>
                 </td>
                 <td><strong>${formatCurrency(venta.total)}</strong></td>

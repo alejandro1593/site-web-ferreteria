@@ -118,8 +118,8 @@ async function loadTopProductos() {
                     <li>
                         <span class="rank">#${index + 1}</span>
                         <div class="product-info">
-                            <div class="product-name">${prod.nombre}</div>
-                            <small>${prod.codigo}</small>
+                            <div class="product-name">${esc(prod.nombre)}</div>
+                            <small>${esc(prod.codigo)}</small>
                         </div>
                         <div class="sales-count">${prod.total_vendido} vendidos</div>
                     </li>
@@ -176,7 +176,7 @@ async function loadVentasPorCategoria() {
                 <div class="categoria-card" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; border-left: 4px solid #667eea;">
                     <div style="margin-bottom: 15px;">
                         <h4 style="margin: 0; color: #667eea; font-size: 16px;">
-                            ${categoria.categoria_nombre}
+                            ${esc(categoria.categoria_nombre)}
                         </h4>
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; font-size: 12px;">
                             <div>
@@ -201,7 +201,7 @@ async function loadVentasPorCategoria() {
                                     <div style="padding: 8px; margin-bottom: 5px; background: white; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
                                         <div style="flex: 1;">
                                             <span style="font-weight: bold; color: #667eea;">#${index + 1}</span>
-                                            <span style="margin-left: 8px; font-weight: 500;">${producto.producto_nombre}</span>
+                                             <span style="margin-left: 8px; font-weight: 500;">${esc(producto.producto_nombre)}</span>
                                             <div style="color: #666; font-size: 11px; margin-top: 3px;">
                                                 ${producto.producto_codigo} • ${formatCurrency(producto.precio_venta)} c/u
                                             </div>

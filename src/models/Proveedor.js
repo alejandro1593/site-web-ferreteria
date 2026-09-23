@@ -1,29 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Proveedor = {
-  // Crear tabla si no existe
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS proveedores (
-        id_proveedor INT AUTO_INCREMENT PRIMARY KEY,
-        nombre VARCHAR(100) NOT NULL,
-        contacto VARCHAR(100),
-        telefono VARCHAR(20),
-        email VARCHAR(100),
-        direccion VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla proveedores:', err);
-      } else {
-        console.log('Tabla proveedores verificada/creada');
-      }
-    });
-  },
-
   // Obtener todos los proveedores
   findAll: (callback) => {
     const sql = 'SELECT * FROM proveedores ORDER BY nombre ASC';
@@ -38,7 +15,7 @@ const Proveedor = {
 
   // Crear nuevo proveedor
   create: (data, callback) => {
-    const sql = 'INSERT INTO proveedores (nombre, contacto, telefono, email, direccion) VALUES (?, ?, ?, ?, ?)';
+    const sql = 'INSERT INTO proveedores (nombre, contacto, telefono, email, direccion) VALUES (?, ?, ?, ?, ?) RETURNING id_proveedor';
     connection.query(sql, [data.nombre, data.contacto, data.telefono, data.email, data.direccion], callback);
   },
 
@@ -60,8 +37,5 @@ const Proveedor = {
     connection.query(sql, [`%${nombre}%`], callback);
   }
 };
-
-// Inicializar tabla
-Proveedor.crearTabla();
 
 module.exports = Proveedor;

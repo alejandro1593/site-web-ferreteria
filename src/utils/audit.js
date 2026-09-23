@@ -1,4 +1,4 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 /**
  * Registra una acción en el log de auditoría.

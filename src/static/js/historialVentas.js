@@ -2,9 +2,10 @@ async function loadVentasStats() {
     try {
         const ventas = await fetchAPIAuth('/ventas');
         
-        const totalVentas = ventas.length;
-        const totalRecaudado = ventas.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
-        const totalItems = ventas.reduce((sum, v) => sum + (parseInt(v.total_items) || 0), 0);
+         const ventasValidas = ventas.filter(venta => venta.estado === 'completada');
+         const totalVentas = ventasValidas.length;
+         const totalRecaudado = ventasValidas.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
+         const totalItems = ventasValidas.reduce((sum, v) => sum + (parseInt(v.total_items) || 0), 0);
         const ventaPromedio = totalVentas > 0 ? totalRecaudado / totalVentas : 0;
         
         const statsHTML = `
@@ -115,9 +116,9 @@ async function verDetallesVenta(idVenta) {
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
                     <div><strong>ID:</strong> #${venta.id_venta}</div>
                     <div><strong>Fecha:</strong> ${formatDate(venta.fecha)}</div>
-                    <div><strong>Cliente:</strong> ${venta.cliente_nombre || 'Sin cliente'}</div>
-                    <div><strong>Estado:</strong> ${venta.estado}</div>
-                    <div><strong>Método Pago:</strong> ${venta.metodo_pago}</div>
+                    <div><strong>Cliente:</strong> ${esc(venta.cliente_nombre) || 'Sin cliente'}</div>
+                    <div><strong>Estado:</strong> ${esc(venta.estado)}</div>
+                    <div><strong>Método Pago:</strong> ${esc(venta.metodo_pago)}</div>
                     <div><strong>Total Items:</strong> ${venta.total_items || 0}</div>
                 </div>
             </div>
@@ -149,8 +150,8 @@ async function verDetallesVenta(idVenta) {
                         ${detalles.map(detalle => `
                             <tr>
                                 <td style="padding: 10px; border: 1px solid #ddd;">
-                                    <strong>${detalle.producto_nombre}</strong><br>
-                                    <small>${detalle.producto_codigo}</small>
+                                    <strong>${esc(detalle.producto_nombre)}</strong><br>
+                                    <small>${esc(detalle.producto_codigo)}</small>
                                 </td>
                                 <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${formatCurrency(detalle.precio_unitario)}</td>
                                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${detalle.cantidad}</td>

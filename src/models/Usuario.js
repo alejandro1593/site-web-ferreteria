@@ -1,38 +1,18 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Usuario = {
-  // Crear tabla si no existe
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id_usuario INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(50) NOT NULL UNIQUE,
-        password VARCHAR(255) NOT NULL,
-        nombre VARCHAR(100) NOT NULL,
-        email VARCHAR(100) UNIQUE,
-        rol ENUM('admin', 'gerente', 'supervisor', 'vendedor', 'cajero', 'almacen') DEFAULT 'vendedor',
-        activo BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla usuarios:', err);
-      } else {
-        console.log('Tabla usuarios verificada/creada');
-      }
-    });
-  },
-
   // Obtener todos los usuarios (sin password)
   findAll: (callback) => {
     const sql = 'SELECT id_usuario, username, nombre, email, rol, activo, created_at, updated_at FROM usuarios ORDER BY nombre ASC';
     connection.query(sql, callback);
   },
 
-  // Obtener usuario por ID (con password para validaciones de caja)
   findById: (id, callback) => {
+    const sql = 'SELECT id_usuario, username, nombre, email, rol, activo, token_version, created_at, updated_at FROM usuarios WHERE id_usuario = ?';
+    connection.query(sql, [id], callback);
+  },
+
+  findByIdWithPassword: (id, callback) => {
     const sql = 'SELECT * FROM usuarios WHERE id_usuario = ?';
     connection.query(sql, [id], callback);
   },
@@ -45,7 +25,7 @@ const Usuario = {
 
   // Crear nuevo usuario
   create: (data, callback) => {
-    const sql = 'INSERT INTO usuarios (username, password, nombre, email, rol, activo) VALUES (?, ?, ?, ?, ?, ?)';
+    const sql = 'INSERT INTO usuarios (username, password, nombre, email, rol, activo) VALUES (?, ?, ?, ?, ?, ?) RETURNING id_usuario';
     connection.query(sql, [data.username, data.password, data.nombre, data.email, data.rol || 'vendedor', data.activo !== false && data.activo !== 0], callback);
   },
 
@@ -79,6 +59,7 @@ const Usuario = {
       return callback(new Error('No hay campos para actualizar'));
     }
 
+    updates.push('token_version = token_version + 1');
     values.push(id);
     const sql = `UPDATE usuarios SET ${updates.join(', ')} WHERE id_usuario = ?`;
     connection.query(sql, values, callback);
@@ -86,7 +67,7 @@ const Usuario = {
 
   // Actualizar contraseña
   updatePassword: (id, password, callback) => {
-    const sql = 'UPDATE usuarios SET password = ? WHERE id_usuario = ?';
+    const sql = 'UPDATE usuarios SET password = ?, token_version = token_version + 1 WHERE id_usuario = ?';
     connection.query(sql, [password, id], callback);
   },
 
@@ -98,18 +79,15 @@ const Usuario = {
 
   // Desactivar usuario (soft delete)
   desactivar: (id, callback) => {
-    const sql = 'UPDATE usuarios SET activo = FALSE WHERE id_usuario = ?';
+    const sql = 'UPDATE usuarios SET activo = FALSE, token_version = token_version + 1 WHERE id_usuario = ?';
     connection.query(sql, [id], callback);
   },
 
   // Activar usuario
   activar: (id, callback) => {
-    const sql = 'UPDATE usuarios SET activo = TRUE WHERE id_usuario = ?';
+    const sql = 'UPDATE usuarios SET activo = TRUE, token_version = token_version + 1 WHERE id_usuario = ?';
     connection.query(sql, [id], callback);
   }
 };
-
-// Inicializar tabla
-Usuario.crearTabla();
 
 module.exports = Usuario;

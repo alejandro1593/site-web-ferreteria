@@ -4,17 +4,20 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --runInBand --forceExit",
+    "test": "jest --runInBand",
+    "lint": "node scripts/check_syntax.js",
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
     "backup": "node scripts/backup_db.js",
-    "migrate": "node scripts/migracion_v2.js"
+    "migrate": "node scripts/postgres_schema.js",
+    "migrate:postgres": "node scripts/postgres_schema.js",
+    "import:mysql": "node scripts/import_mysql_dump.js",
+    "import:mysql:dry-run": "node scripts/import_mysql_dump.js --dry-run"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -22,10 +25,9 @@
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
-    "jspdf": "^4.0.0",
-    "multer": "^2.0.2",
-    "mysql2": "^3.16.0",
-    "node-fetch": "^3.3.2"
+    "jspdf": "^4.2.1",
+    "multer": "^2.4.0",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "jest": "^30.4.2",

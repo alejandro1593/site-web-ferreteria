@@ -69,14 +69,14 @@ async function loadClientes() {
         
         const selectHTML = '<option value="">Seleccionar cliente...</option>' +
             clientes.map(cliente => `
-                <option value="${cliente.id_cliente}">${cliente.nombre} (${cliente.dni})</option>
+                <option value="${cliente.id_cliente}">${esc(cliente.nombre)} (${esc(cliente.dni)})</option>
             `).join('');
         
         document.getElementById('cliente-select').innerHTML = selectHTML;
         
         const filtroHTML = '<option value="">Todos los clientes</option>' +
             clientes.map(cliente => `
-                <option value="${cliente.id_cliente}">${cliente.nombre}</option>
+                <option value="${cliente.id_cliente}">${esc(cliente.nombre)}</option>
             `).join('');
         
         const filtroElemento = document.getElementById('filtro-cliente');
@@ -111,7 +111,7 @@ async function loadProductos() {
                 <option value="${producto.id_producto}" 
                         data-precio="${producto.precio_venta}" 
                         data-stock="${producto.stock_actual}">
-                    ${producto.nombre} (${producto.codigo}) - Stock: ${producto.stock_actual}
+                    ${esc(producto.nombre)} (${esc(producto.codigo)}) - Stock: ${producto.stock_actual}
                 </option>
             `).join('');
         
@@ -253,7 +253,7 @@ function renderizarProductos() {
     container.innerHTML = productosCotizacion.map((detalle, index) => `
         <div class="cart-item" style="margin-bottom: 10px;">
             <div class="cart-item-header">
-                <span class="cart-item-name">${detalle.producto_nombre}</span>
+                <span class="cart-item-name">${esc(detalle.producto_nombre)}</span>
                 <button type="button" class="btn btn-danger btn-sm" onclick="eliminarProducto(${index})">
                     🗑️
                 </button>
@@ -413,12 +413,12 @@ async function loadCotizaciones() {
             return `
                 <tr>
                     <td>#${cotizacion.id_cotizacion}</td>
-                    <td>${cotizacion.cliente_nombre}</td>
+                    <td>${esc(cotizacion.cliente_nombre) || 'Sin cliente'}</td>
                     <td>${formatDate(cotizacion.fecha_emision)}</td>
                     <td>${cotizacion.fecha_validez ? formatDate(cotizacion.fecha_validez) : 'Sin vigencia'}</td>
                     <td>
                         <span class="status-badge ${estadoClass}">
-                            ${cotizacion.estado}
+                            ${esc(cotizacion.estado)}
                         </span>
                     </td>
                     <td>${formatCurrency(cotizacion.subtotal || 0)}</td>
@@ -466,8 +466,8 @@ async function verDetalles(idCotizacion) {
                     ${detalles.map(detalle => `
                         <div style="padding: 10px; margin-bottom: 5px; background: #f0f0f0; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
                             <div style="flex: 1;">
-                                <strong>${detalle.producto_nombre}</strong><br>
-                                <small>${detalle.producto_codigo} • Stock: ${detalle.stock_actual}</small>
+                                <strong>${esc(detalle.producto_nombre)}</strong><br>
+                                <small>${esc(detalle.producto_codigo)} • Stock: ${detalle.stock_actual}</small>
                             </div>
                             <div style="text-align: right;">
                                 <div>${detalle.cantidad} x ${formatCurrency(detalle.precio_unitario)}</div>

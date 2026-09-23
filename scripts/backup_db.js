@@ -1,83 +1,44 @@
-/**
- * Backup de la base de datos MySQL usando mysqldump.
- * Genera: backups/backup_AAAA-MM-DD_HHmmss.sql
- *
- * Uso manual:   node scripts/backup_db.js
- * Automático:   programar con el Programador de tareas de Windows:
- *               Programador de tareas → Crear tarea básica → Diaria
- *               Acción: iniciar programa  node.exe
- *               Argumentos: C:\Users\Usuario\Desktop\Ferreteria\scripts\backup_db.js
- */
-const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { Client } = require('pg');
 require('dotenv').config();
+const { getConnectionOptions } = require('../src/config/db_postgres');
 
-const DB_HOST = process.env.DB_HOST || 'localhost';
-const DB_USER = process.env.DB_USER || 'root';
-const DB_PASSWORD = process.env.DB_PASSWORD || '';
-const DB_NAME = process.env.DB_NAME || 'db_ferreteria';
+const tables = ['categorias', 'proveedores', 'clientes', 'usuarios', 'productos', 'caja', 'ventas', 'venta_detalle', 'compras', 'compra_detalles', 'cotizaciones', 'cotizacion_detalles', 'devoluciones', 'ajustes_inventario', 'log_acciones', 'pagos_venta'];
 
-const backupsDir = path.join(__dirname, '..', 'backups');
-
-if (!fs.existsSync(backupsDir)) {
-  fs.mkdirSync(backupsDir, { recursive: true });
-}
-
-const ahora = new Date();
-const stamp = ahora.toISOString().slice(0, 19).replace(/[:T]/g, '-');
-const archivo = path.join(backupsDir, `backup_${stamp}.sql`);
-
-// Buscar mysqldump en PATH o en ubicaciones comunes de Windows
-function encontrarMysqldump() {
-  const candidatos = [
-    'mysqldump',
-    'C:\\xampp\\mysql\\bin\\mysqldump.exe',
-    'C:\\wamp64\\bin\\mysql\\mysql5.7.36\\bin\\mysqldump.exe',
-    'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump.exe'
-  ];
-  for (const candidato of candidatos) {
-    try {
-      require('child_process').execFileSync(candidato, ['--version'], { stdio: 'pipe' });
-      return candidato;
-    } catch (e) {
-      // siguiente candidato
+async function main() {
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL no configurada');
+  const directory = path.join(__dirname, '..', 'backups');
+  fs.mkdirSync(directory, { recursive: true });
+  const client = new Client(getConnectionOptions(process.env.DATABASE_URL));
+  await client.connect();
+  const snapshot = { created_at: new Date().toISOString(), tables: {} };
+  try {
+    await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    for (const table of tables) {
+      const result = await client.query(`SELECT * FROM "${table}"`);
+      snapshot.tables[table] = result.rows;
     }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    await client.end();
   }
-  return null;
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const file = path.join(directory, `backup_${stamp}.json`);
+  fs.writeFileSync(file, JSON.stringify(snapshot, null, 2), { encoding: 'utf8', mode: 0o600 });
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  for (const name of fs.readdirSync(directory)) {
+    if (!name.startsWith('backup_') || (!name.endsWith('.json') && !name.endsWith('.sql'))) continue;
+    const target = path.join(directory, name);
+    if (fs.statSync(target).mtimeMs < cutoff) fs.unlinkSync(target);
+  }
+  console.log(`Backup creado: ${file}`);
 }
 
-const mysqldumpPath = encontrarMysqldump();
-if (!mysqldumpPath) {
-  console.error('❌ mysqldump no encontrado. Instale MySQL Client Tools o verifique XAMPP/WAMP.');
+main().catch((error) => {
+  console.error('Error al generar backup:', error.code || error.message);
   process.exit(1);
-}
-
-console.log(`📦 Generando backup de "${DB_NAME}"...`);
-
-execFile(
-  mysqldumpPath,
-  [`--host=${DB_HOST}`, `--user=${DB_USER}`, '--result-file=' + archivo, DB_NAME],
-  { env: { ...process.env, MYSQL_PWD: DB_PASSWORD } },
-  (err) => {
-    if (err) {
-      console.error('❌ Error al generar el backup:', err.message);
-      process.exit(1);
-    }
-
-    const size = (fs.statSync(archivo).size / 1024).toFixed(1);
-    console.log(`✅ Backup creado: ${archivo} (${size} KB)`);
-
-    // Eliminar backups con más de 30 días
-    const limite = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    fs.readdirSync(backupsDir)
-      .filter(f => f.startsWith('backup_') && f.endsWith('.sql'))
-      .forEach(f => {
-        const ruta = path.join(backupsDir, f);
-        if (fs.statSync(ruta).mtimeMs < limite) {
-          fs.unlinkSync(ruta);
-          console.log(`🗑️  Backup antiguo eliminado: ${f}`);
-        }
-      });
-  }
-);
+});

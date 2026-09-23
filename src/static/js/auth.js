@@ -16,7 +16,6 @@ async function login(username, password) {
         console.log('Respuesta del servidor:', response.status);
 
         const data = await response.json();
-        console.log('Datos recibidos:', data);
 
         if (!response.ok) {
             throw new Error(data.error || 'Error en el login');
@@ -180,10 +179,10 @@ function displayUserInfo() {
         userInfoElement.innerHTML = `
             <div class="user-info-content">
                 <div class="user-avatar ${rolInfo.className}">
-                    ${usuario.nombre.charAt(0).toUpperCase()}
+                    ${esc(usuario.nombre.charAt(0).toUpperCase())}
                 </div>
                 <div class="user-details">
-                    <div class="user-name">${usuario.nombre}</div>
+                    <div class="user-name">${esc(usuario.nombre)}</div>
                     <div class="user-role-badge ${rolInfo.className}">
                         <span class="role-icon">${rolInfo.icon}</span>
                         <span class="role-text">${rolInfo.nombre}</span>

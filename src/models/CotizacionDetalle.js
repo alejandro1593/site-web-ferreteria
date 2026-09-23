@@ -1,30 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const CotizacionDetalle = {
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS cotizacion_detalles (
-        id_detalle INT AUTO_INCREMENT PRIMARY KEY,
-        id_cotizacion INT NOT NULL,
-        id_producto INT NOT NULL,
-        cantidad INT NOT NULL,
-        precio_unitario DECIMAL(10,2),
-        descuento_producto DECIMAL(10,2) DEFAULT 0,
-        subtotal DECIMAL(10,2),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (id_cotizacion) REFERENCES cotizaciones(id_cotizacion) ON DELETE CASCADE,
-        FOREIGN KEY (id_producto) REFERENCES productos(id_producto) ON DELETE RESTRICT
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla cotizacion_detalles:', err);
-      } else {
-        console.log('Tabla cotizacion_detalles verificada/creada');
-      }
-    });
-  },
-
   findByIdCotizacion: (idCotizacion, callback) => {
     const sql = `
       SELECT cd.*, 
@@ -51,7 +27,7 @@ const CotizacionDetalle = {
         precio_unitario, 
         descuento_producto, 
         subtotal
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?) RETURNING id_detalle
     `;
     connection.query(sql, [
       data.id_cotizacion,
@@ -74,5 +50,4 @@ const CotizacionDetalle = {
   }
 };
 
-CotizacionDetalle.crearTabla();
 module.exports = CotizacionDetalle;

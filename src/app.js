@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -20,9 +19,6 @@ require('./models/Caja');
 require('./models/Cotizacion');
 require('./models/CotizacionDetalle');
 
-// Importar controlador
-const ProductoController = require('./controllers/ProductoController');
-
 // Importar rutas
 const apiRoutes = require('./routes');
 const viewRoutes = require('./routeViews/viewRoutes');
@@ -30,39 +26,20 @@ const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
-// Configuración de Multer para subida de archivos
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, '..', 'uploads', 'productos');
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Tipo de archivo no permitido. Solo se permiten: JPG, PNG, GIF, WebP'));
-    }
-  }
-});
-
 // Middlewares básicos
 app.use(helmet({
-  contentSecurityPolicy: false // Las vistas usan scripts/estilos inline
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"]
+    }
+  }
 }));
 
 // Limitador general para la API: máx 300 peticiones por minuto por IP
@@ -87,33 +64,68 @@ const authLimiter = rateLimit({
   message: { error: 'Demasiados intentos. Espere 15 minutos antes de volver a intentar' }
 });
 
+const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.1.5:3000'],
+    origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
     optionsSuccessStatus: 200
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Servir archivos estáticos
-app.use('/static', express.static('src/static'));
+app.use('/static', express.static(path.join(__dirname, 'static')));
 
 // Servir archivos subidos
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Montar rutas
 app.use('/', viewRoutes);
 app.use('/api', apiLimiter, apiRoutes);
 app.use('/api/auth', authLimiter, authRoutes);
 
-// Servidor (no se inicia cuando app.js es importado por los tests)
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  if (error instanceof multer.MulterError || error.message === 'Tipo o extensión de archivo no permitido') {
+    return res.status(400).json({ error: 'Archivo inválido' });
+  }
+  if (error instanceof SyntaxError && error.status === 400 && error.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'JSON inválido' });
+  }
+  res.status(500).json({ error: 'Error interno del servidor' });
+});
+
+function validateRuntimeConfig() {
+  const secret = process.env.JWT_SECRET || '';
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL no configurada');
+  if (secret.length < 32 || secret === 'genera_un_secreto_largo_y_aleatorio') throw new Error('JWT_SECRET inválido');
+}
+
 if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  });
+  try {
+    validateRuntimeConfig();
+    const PORT = process.env.PORT || 3000;
+    const database = require('./config/db_postgres');
+    database.pool.query('SELECT 1')
+      .then(() => {
+        app.listen(PORT, () => {
+          console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+        });
+      })
+      .catch((error) => {
+        console.error('No se pudo conectar con PostgreSQL:', error.code || error.message);
+        process.exit(1);
+      });
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
 }
 
 module.exports = app;

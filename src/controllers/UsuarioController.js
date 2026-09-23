@@ -1,5 +1,5 @@
 const Usuario = require('../models/Usuario');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { registrarAccion } = require('../utils/audit');
 
 const UsuarioController = {
@@ -34,6 +34,7 @@ const UsuarioController = {
     if (!username || !password || !nombre) {
       return res.status(400).json({ error: 'Username, password y nombre son requeridos' });
     }
+    if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
 
     const ROLES_VALIDOS = ['admin', 'gerente', 'supervisor', 'vendedor', 'cajero', 'almacen'];
 
@@ -158,6 +159,7 @@ const UsuarioController = {
     if (!password) {
       return res.status(400).json({ error: 'El password es requerido' });
     }
+    if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
 
     try {
       const hashedPassword = await bcrypt.hash(password, 10);

@@ -27,7 +27,7 @@ async function loadClientes() {
         clienteSelect.innerHTML = '<option value="">Seleccionar cliente...</option>' +
             clientes.map(cli =>
                 `<option value="${cli.id_cliente}">
-                    ${cli.nombre} ${cli.apellido} - ${cli.dni}
+                    ${esc(cli.nombre)} ${esc(cli.apellido)} - ${esc(cli.dni)}
                 </option>`
             ).join('');
 
@@ -104,8 +104,8 @@ function renderHistorial() {
             <td><strong>#${venta.id_venta}</strong></td>
             <td>${formatDateTime(venta.fecha)}</td>
             <td>
-                <small title="${venta.productos_resumen}">
-                    ${venta.productos_resumen ? venta.productos_resumen.substring(0, 50) + (venta.productos_resumen.length > 50 ? '...' : '') : '-'}
+                <small title="${esc(venta.productos_resumen)}">
+                    ${venta.productos_resumen ? esc(venta.productos_resumen.substring(0, 50)) + (venta.productos_resumen.length > 50 ? '...' : '') : '-'}
                 </small>
             </td>
             <td>${venta.total_items || 0}</td>
@@ -148,8 +148,8 @@ async function verDetallesVenta(idVenta) {
                     <h4>📋 Información de la Venta</h4>
                     <p><strong>Venta #${venta.id_venta}</strong></p>
                     <p>Fecha: ${formatDateTime(venta.fecha)}</p>
-                    <p>Cliente: ${clienteNombre}</p>
-                    <p>DNI Cliente: ${venta.cliente_dni || 'N/A'}</p>
+                    <p>Cliente: ${esc(clienteNombre)}</p>
+                    <p>DNI Cliente: ${esc(venta.cliente_dni) || 'N/A'}</p>
                 </div>
                 <div class="venta-detalle-totales">
                     <h4>💰 Totales</h4>
@@ -188,8 +188,8 @@ async function verDetallesVenta(idVenta) {
             detallesHTML += detalles.map(detalle => `
                 <tr>
                     <td>
-                        <strong>${detalle.producto_nombre}</strong>
-                        ${detalle.producto_descripcion ? `<br><small>${detalle.producto_descripcion.substring(0, 100)}${detalle.producto_descripcion.length > 100 ? '...' : ''}</small>` : ''}
+                        <strong>${esc(detalle.producto_nombre)}</strong>
+                        ${detalle.producto_descripcion ? `<br><small>${esc(detalle.producto_descripcion.substring(0, 100))}${detalle.producto_descripcion.length > 100 ? '...' : ''}</small>` : ''}
                     </td>
                     <td><code>${detalle.producto_codigo}</code></td>
                     <td>${detalle.cantidad}</td>
@@ -513,16 +513,16 @@ function exportarHistorialPDF() {
             <tr>
                 <td><strong>${venta.id_venta}</strong></td>
                 <td>${formatDateTimePDF(venta.fecha)}</td>
-                <td>${venta.productos_resumen || '-'}</td>
+                <td>${esc(venta.productos_resumen) || '-'}</td>
                 <td class="text-center">${venta.total_items || 0}</td>
                 <td class="text-right">${formatCurrencyPDF(venta.subtotal)}</td>
                 <td class="text-right">${formatCurrencyPDF(venta.iva)}</td>
                 <td class="text-right">${formatCurrencyPDF(venta.descuento || 0)}</td>
                 <td class="text-right"><strong>${formatCurrencyPDF(venta.total)}</strong></td>
-                <td>${venta.metodo_pago || '-'}</td>
+                <td>${esc(venta.metodo_pago) || '-'}</td>
                 <td class="text-center">
                     <span class="badge ${venta.estado === 'completada' ? 'badge-success' : venta.estado === 'pendiente' ? 'badge-warning' : 'badge-danger'}">
-                        ${venta.estado}
+                        ${esc(venta.estado)}
                     </span>
                 </td>
             </tr>
@@ -804,13 +804,13 @@ async function exportarFacturaPDF(idVenta) {
                             <span class="info-label">Estado:</span>
                             <span class="info-value">
                                 <span class="badge ${venta.estado === 'completada' ? 'badge-success' : venta.estado === 'pendiente' ? 'badge-warning' : 'badge-danger'}">
-                                    ${venta.estado}
+                                    ${esc(venta.estado)}
                                 </span>
                             </span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Método de Pago:</span>
-                            <span class="info-value">${venta.metodo_pago || '-'}</span>
+                             <span class="info-value">${esc(venta.metodo_pago) || '-'}</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Cliente:</span>
@@ -869,9 +869,9 @@ async function exportarFacturaPDF(idVenta) {
                 html += `
                     <tr>
                         <td>
-                            <strong>${detalle.producto_nombre}</strong>
+                            <strong>${esc(detalle.producto_nombre)}</strong>
                         </td>
-                        <td><code>${detalle.producto_codigo}</code></td>
+                    <td><code>${esc(detalle.producto_codigo)}</code></td>
                         <td class="text-center">${detalle.cantidad}</td>
                         <td class="text-right">${formatCurrencyPDF(detalle.precio_unitario)}</td>
                         <td class="text-right"><strong>${formatCurrencyPDF(detalle.subtotal)}</strong></td>

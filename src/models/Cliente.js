@@ -1,30 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Cliente = {
-  // Crear tabla si no existe
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS clientes (
-        id_cliente INT AUTO_INCREMENT PRIMARY KEY,
-        nombre VARCHAR(100) NOT NULL,
-        apellido VARCHAR(100),
-        dni VARCHAR(20) UNIQUE,
-        telefono VARCHAR(20),
-        email VARCHAR(100),
-        direccion VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla clientes:', err);
-      } else {
-        console.log('Tabla clientes verificada/creada');
-      }
-    });
-  },
-
   // Obtener todos los clientes
   findAll: (callback) => {
     const sql = 'SELECT * FROM clientes ORDER BY nombre ASC';
@@ -39,7 +15,7 @@ const Cliente = {
 
   // Crear nuevo cliente
   create: (data, callback) => {
-    const sql = 'INSERT INTO clientes (nombre, apellido, dni, telefono, email, direccion) VALUES (?, ?, ?, ?, ?, ?)';
+    const sql = 'INSERT INTO clientes (nombre, apellido, dni, telefono, email, direccion) VALUES (?, ?, ?, ?, ?, ?) RETURNING id_cliente';
     connection.query(sql, [data.nombre, data.apellido, data.dni, data.telefono, data.email, data.direccion], callback);
   },
 
@@ -67,8 +43,5 @@ const Cliente = {
     connection.query(sql, [dni], callback);
   }
 };
-
-// Inicializar tabla
-Cliente.crearTabla();
 
 module.exports = Cliente;

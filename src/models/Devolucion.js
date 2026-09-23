@@ -1,34 +1,6 @@
-const connection = require('../config/db_mysql');
+const connection = require('../config/db_postgres');
 
 const Devolucion = {
-  crearTabla: () => {
-    const sql = `
-      CREATE TABLE IF NOT EXISTS devoluciones (
-        id_devolucion INT AUTO_INCREMENT PRIMARY KEY,
-        id_venta INT NOT NULL,
-        id_producto INT NOT NULL,
-        cantidad INT NOT NULL,
-        motivo VARCHAR(255),
-        fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-        monto_reembolso DECIMAL(10,2),
-        metodo_reembolso VARCHAR(50),
-        estado VARCHAR(20) DEFAULT 'completada',
-        id_usuario INT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (id_venta) REFERENCES ventas(id_venta) ON DELETE CASCADE,
-        FOREIGN KEY (id_producto) REFERENCES productos(id_producto) ON DELETE RESTRICT,
-        FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE SET NULL
-      )
-    `;
-    connection.query(sql, (err, result) => {
-      if (err) {
-        console.error('Error al crear tabla devoluciones:', err);
-      } else {
-        console.log('Tabla devoluciones verificada/creada');
-      }
-    });
-  },
-
   findAll: (callback) => {
     const sql = `
       SELECT d.*, 
@@ -79,7 +51,7 @@ const Devolucion = {
   create: (data, callback) => {
     const sql = `
       INSERT INTO devoluciones (id_venta, id_producto, cantidad, motivo, monto_reembolso, metodo_reembolso, estado, id_usuario)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id_devolucion
     `;
     connection.query(sql, [
       data.id_venta,
@@ -102,7 +74,8 @@ const Devolucion = {
       FROM devoluciones d
       JOIN productos p ON d.id_producto = p.id_producto
       LEFT JOIN usuarios u ON d.id_usuario = u.id_usuario
-      WHERE DATE(d.fecha) BETWEEN ? AND ?
+      WHERE d.fecha >= CAST(? AS date)
+        AND d.fecha < CAST(? AS date) + INTERVAL '1 day'
       ORDER BY d.fecha DESC
     `;
     connection.query(sql, [fechaInicio, fechaFin], callback);
@@ -115,7 +88,9 @@ const Devolucion = {
         SUM(monto_reembolso) as total_reembolsado,
         SUM(cantidad) as total_productos_devueltos
       FROM devoluciones
-      WHERE fecha BETWEEN ? AND ? AND estado = 'completada'
+      WHERE fecha >= CAST(? AS date)
+        AND fecha < CAST(? AS date) + INTERVAL '1 day'
+        AND estado = 'completada'
     `;
     connection.query(sql, [fechaInicio, fechaFin], callback);
   },
@@ -133,5 +108,4 @@ const Devolucion = {
   }
 };
 
-Devolucion.crearTabla();
 module.exports = Devolucion;

@@ -1,260 +1,208 @@
+const connection = require('../config/db_postgres');
 const Cotizacion = require('../models/Cotizacion');
 const CotizacionDetalle = require('../models/CotizacionDetalle');
-const Venta = require('../models/Venta');
-const VentaDetalle = require('../models/VentaDetalle');
-const Producto = require('../models/Producto');
+const { registrarAccion } = require('../utils/audit');
+
+const METODOS_PAGO = new Set(['efectivo', 'tarjeta', 'transferencia', 'credito']);
+const ESTADOS = new Set(['pendiente', 'aprobada', 'rechazada', 'convertida']);
+
+function crearError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function aCentavos(value) {
+  return Math.round(Number(value) * 100);
+}
+
+function idValido(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function validarFecha(fecha) {
+  if (fecha === undefined || fecha === null || fecha === '') return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(`${fecha}T00:00:00`))) {
+    throw crearError('La fecha de validez no es válida');
+  }
+  return fecha;
+}
 
 const CotizacionController = {
   getAll: (req, res) => {
-    const { id_cliente, estado } = req.query;
-    
     const filters = {};
-    if (id_cliente) filters.id_cliente = id_cliente;
-    if (estado) filters.estado = estado;
-    
-    if (Object.keys(filters).length > 0) {
-      Cotizacion.findWithFilters(filters, (err, results) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al obtener cotizaciones' });
-        }
-        res.json(results);
-      });
-    } else {
-      Cotizacion.findAll((err, results) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al obtener cotizaciones' });
-        }
-        res.json(results);
-      });
-    }
+    if (req.query.id_cliente) filters.id_cliente = req.query.id_cliente;
+    if (req.query.estado) filters.estado = req.query.estado;
+    const method = Object.keys(filters).length > 0 ? Cotizacion.findWithFilters.bind(Cotizacion, filters) : Cotizacion.findAll.bind(Cotizacion);
+    method((err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al obtener cotizaciones' });
+      res.json(results);
+    });
   },
 
   getById: (req, res) => {
-    const { id } = req.params;
-    Cotizacion.findById(id, (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error al obtener cotizacion' });
-      }
-      if (results.length === 0) {
-        return res.status(404).json({ error: 'Cotizacion no encontrada' });
-      }
+    Cotizacion.findById(req.params.id, (err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al obtener cotizacion' });
+      if (results.length === 0) return res.status(404).json({ error: 'Cotizacion no encontrada' });
       res.json(results[0]);
     });
   },
 
   getByCliente: (req, res) => {
-    const { idCliente } = req.params;
-    Cotizacion.findByCliente(idCliente, (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error al obtener cotizaciones del cliente' });
-      }
+    Cotizacion.findByCliente(req.params.idCliente, (err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al obtener cotizaciones del cliente' });
       res.json(results);
     });
   },
 
-  create: (req, res) => {
-    const userInfo = req.user;
-    const { 
-      id_cliente, 
-      detalles, 
-      fecha_validez, 
-      observaciones 
-    } = req.body || {};
-    
-    console.log('=== INICIO CREAR COTIZACIÓN ===');
-    console.log('Usuario:', userInfo);
-    console.log('Usuario ID:', userInfo?.id_usuario);
-    console.log('ID Cliente:', id_cliente);
-    console.log('Detalles:', detalles);
-    console.log('Fecha Validez:', fecha_validez);
-    console.log('Observaciones:', observaciones);
-    
-    if (!userInfo || !userInfo.id_usuario) {
-      console.log('Error: No hay información de usuario');
-      return res.status(401).json({ error: 'Usuario no autenticado correctamente' });
-    }
-    
-    if (!detalles || detalles.length === 0) {
-      console.log('Error: No hay detalles');
+  create: async (req, res) => {
+    const idCliente = idValido(req.body?.id_cliente);
+    if (!idCliente) return res.status(400).json({ error: 'ID de cliente es requerido' });
+    if (!Array.isArray(req.body?.detalles) || req.body.detalles.length === 0) {
       return res.status(400).json({ error: 'Se debe incluir al menos un detalle' });
     }
 
-    if (!id_cliente) {
-      console.log('Error: No hay cliente');
-      return res.status(400).json({ error: 'ID de cliente es requerido' });
+    let fechaValidez;
+    try {
+      fechaValidez = validarFecha(req.body?.fecha_validez);
+    } catch (error) {
+      return res.status(error.status).json({ error: error.message });
     }
 
-    CalcularTotales(detalles, (err, totales) => {
-      if (err) {
-        console.log('Error en CalcularTotales:', err);
-        return res.status(400).json({ error: err.message });
+    const productosSolicitados = new Map();
+    try {
+      for (const detalle of req.body.detalles) {
+        const idProducto = idValido(detalle?.id_producto);
+        const cantidad = Number(detalle?.cantidad);
+        const descuento = Number(detalle?.descuento ?? 0);
+        if (!idProducto || !Number.isInteger(cantidad) || cantidad <= 0 || !Number.isFinite(descuento) || descuento < 0) {
+          throw crearError('Cada detalle requiere producto, cantidad positiva y descuento válido');
+        }
+        const actual = productosSolicitados.get(idProducto) || { cantidad: 0, descuento: 0 };
+        actual.cantidad += cantidad;
+        actual.descuento += descuento;
+        productosSolicitados.set(idProducto, actual);
       }
+    } catch (error) {
+      return res.status(error.status).json({ error: error.message });
+    }
 
-      const cotizacionData = {
-        id_cliente,
-        fecha_validez,
-        subtotal: totales.subtotal,
-        iva: totales.iva,
-        descuento: totales.descuento,
-        total: totales.total,
-        estado: 'pendiente',
-        observaciones,
-        id_usuario: userInfo.id_usuario || userInfo.id
-      };
+    const descuentoGlobal = Number(req.body?.descuento_global ?? 0);
+    if (!Number.isFinite(descuentoGlobal) || descuentoGlobal < 0) {
+      return res.status(400).json({ error: 'El descuento global no es válido' });
+    }
 
-      console.log('Datos de cotización a guardar:', cotizacionData);
+    try {
+      const resultado = await connection.withTransaction(async (client) => {
+        const productos = [];
+        for (const idProducto of [...productosSolicitados.keys()].sort((a, b) => a - b)) {
+          const productResult = await client.query(
+            'SELECT id_producto, nombre, precio_venta, stock_actual FROM productos WHERE id_producto = $1 AND activo = TRUE FOR UPDATE',
+            [idProducto]
+          );
+          if (productResult.rowCount === 0) throw crearError(`Producto ${idProducto} no encontrado`);
+          const producto = productResult.rows[0];
+          const solicitado = productosSolicitados.get(idProducto);
+          if (Number(producto.stock_actual) < solicitado.cantidad) throw crearError(`Stock insuficiente para ${producto.nombre}`);
+          productos.push({ ...producto, ...solicitado });
+        }
 
-        Cotizacion.create(cotizacionData, (err, result) => {
-          if (err) {
-            console.log('Error al crear cotización:', err);
-            console.log('Error code:', err.code);
-            console.log('Error message:', err.message);
-            return res.status(500).json({ error: 'Error al crear cotizacion', details: err.message });
-          }
-
-          const idCotizacion = result.insertId;
-          const totalFinal = totales.total;
-          console.log('✅ Cotización creada con ID:', idCotizacion);
-
-          const detallePromises = detalles.map(detalle => {
-            return new Promise((resolve, reject) => {
-              console.log('Creando detalle para producto:', detalle.id_producto);
-              CotizacionDetalle.create({
-                id_cotizacion: idCotizacion,
-                id_producto: detalle.id_producto,
-                cantidad: detalle.cantidad,
-                precio_unitario: detalle.precio_unitario,
-                descuento_producto: detalle.descuento || 0,
-                subtotal: detalle.subtotal
-              }, (err) => {
-                if (err) {
-                  console.log('❌ Error al crear detalle:', err);
-                  reject(err);
-                } else {
-                  console.log('✅ Detalle creado para producto:', detalle.id_producto);
-                  resolve();
-                }
-              });
-            });
-          });
-
-          Promise.all(detallePromises)
-            .then(() => {
-              console.log('✅ Todos los detalles creados exitosamente');
-              res.status(201).json({
-                message: 'Cotizacion creada exitosamente',
-                id: idCotizacion,
-                total: totalFinal
-              });
-            })
-            .catch(err => {
-              console.log('❌ Error al crear detalles:', err);
-              console.log('❌ Error details:', err.message);
-              
-              Cotizacion.delete(idCotizacion, () => {
-                console.log('🗑️ Cotización eliminada por error en detalles');
-              });
-              
-              res.status(500).json({ error: 'Error al crear detalles de cotizacion', details: err.message });
-            });
+        const lineas = productos.map((producto) => {
+          const bruto = aCentavos(producto.precio_venta) * producto.cantidad;
+          const descuento = Math.min(aCentavos(producto.descuento), bruto);
+          return { ...producto, subtotal: bruto - descuento };
         });
-    });
+        const brutoCentavos = lineas.reduce((sum, linea) => sum + aCentavos(linea.precio_venta) * linea.cantidad, 0);
+        const descuentoLineas = lineas.reduce((sum, linea) => sum + aCentavos(linea.precio_venta) * linea.cantidad - linea.subtotal, 0);
+        const subtotalCentavos = Math.max(brutoCentavos - descuentoLineas - aCentavos(descuentoGlobal), 0);
+        const ivaCentavos = Math.round(subtotalCentavos * 0.16);
+        const totalCentavos = subtotalCentavos + ivaCentavos;
+        const observaciones = String(req.body?.observaciones || '').trim().slice(0, 2000);
+
+        const quoteResult = await client.query(
+          `INSERT INTO cotizaciones (id_cliente, fecha_validez, subtotal, iva, descuento, total, estado, observaciones, id_usuario)
+           VALUES ($1, $2, $3, $4, $5, $6, 'pendiente', $7, $8)
+           RETURNING id_cotizacion`,
+          [idCliente, fechaValidez, subtotalCentavos / 100, ivaCentavos / 100, (descuentoLineas + aCentavos(descuentoGlobal)) / 100, totalCentavos / 100, observaciones, req.user.id_usuario || null]
+        );
+        const idCotizacion = quoteResult.rows[0].id_cotizacion;
+
+        for (const linea of lineas) {
+          await client.query(
+            `INSERT INTO cotizacion_detalles (id_cotizacion, id_producto, cantidad, precio_unitario, descuento_producto, subtotal)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [idCotizacion, linea.id_producto, linea.cantidad, linea.precio_venta, (aCentavos(linea.precio_venta) * linea.cantidad - linea.subtotal) / 100, linea.subtotal / 100]
+          );
+        }
+
+        return { id: idCotizacion, total: totalCentavos / 100 };
+      });
+
+      registrarAccion(req, 'crear', 'cotizacion', resultado.id, `Total ${resultado.total}`);
+      res.status(201).json({ message: 'Cotizacion creada exitosamente', id: resultado.id, total: resultado.total });
+    } catch (error) {
+      const status = error.status || (error.code === '23503' ? 400 : 500);
+      res.status(status).json({ error: status === 500 ? 'Error al crear cotizacion' : error.message });
+    }
   },
 
   update: (req, res) => {
-    const { id } = req.params;
-    const { estado, fecha_validez, observaciones } = req.body || {};
-
     const updateData = {};
-    if (estado !== undefined) updateData.estado = estado;
-    if (fecha_validez !== undefined) updateData.fecha_validez = fecha_validez;
-    if (observaciones !== undefined) updateData.observaciones = observaciones;
-
-    Cotizacion.findById(id, (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error al verificar cotizacion' });
+    if (req.body?.estado !== undefined) {
+      if (!ESTADOS.has(req.body.estado)) return res.status(400).json({ error: 'Estado inválido' });
+      if (req.body.estado === 'convertida') return res.status(409).json({ error: 'La conversión se realiza por un endpoint específico' });
+      updateData.estado = req.body.estado;
+    }
+    if (req.body?.fecha_validez !== undefined) {
+      try {
+        updateData.fecha_validez = validarFecha(req.body.fecha_validez);
+      } catch (error) {
+        return res.status(error.status).json({ error: error.message });
       }
+    }
+    if (req.body?.observaciones !== undefined) updateData.observaciones = String(req.body.observaciones).slice(0, 2000);
+    if (Object.keys(updateData).length === 0) return res.status(400).json({ error: 'No hay campos para actualizar' });
 
-      if (results.length === 0) {
-        return res.status(404).json({ error: 'Cotizacion no encontrada' });
-      }
-
-      Cotizacion.update(id, updateData, (err, result) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al actualizar cotizacion' });
-        }
-        
+    Cotizacion.findById(req.params.id, (err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al verificar cotizacion' });
+      if (results.length === 0) return res.status(404).json({ error: 'Cotizacion no encontrada' });
+      if (results[0].estado === 'convertida') return res.status(409).json({ error: 'Una cotización convertida no se puede modificar' });
+      Cotizacion.update(req.params.id, updateData, (error, rows, result) => {
+        if (error) return res.status(500).json({ error: 'Error al actualizar cotizacion' });
+        if (!result || result.rowCount === 0) return res.status(409).json({ error: 'La cotización fue convertida simultáneamente' });
         res.json({ message: 'Cotizacion actualizada exitosamente' });
       });
     });
   },
 
   delete: (req, res) => {
-    const { id } = req.params;
-
-    Cotizacion.findById(id, (err, results) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error al verificar cotizacion' });
-      }
-
-      if (results.length === 0) {
-        return res.status(404).json({ error: 'Cotizacion no encontrada' });
-      }
-
-      Cotizacion.delete(id, (err, result) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al eliminar cotizacion' });
-        }
-
+    Cotizacion.findById(req.params.id, (err, results) => {
+      if (err) return res.status(500).json({ error: 'Error al verificar cotizacion' });
+      if (results.length === 0) return res.status(404).json({ error: 'Cotizacion no encontrada' });
+      if (results[0].estado === 'convertida') return res.status(409).json({ error: 'Una cotización convertida no se puede eliminar' });
+      Cotizacion.delete(req.params.id, (error, rows, result) => {
+        if (error) return res.status(500).json({ error: 'Error al eliminar cotizacion' });
+        if (!result || result.rowCount === 0) return res.status(409).json({ error: 'La cotización fue convertida simultáneamente' });
         res.json({ message: 'Cotizacion eliminada exitosamente' });
       });
     });
   },
 
   getDetalles: (req, res) => {
-    const { id } = req.params;
-    CotizacionDetalle.findByIdCotizacion(id, (err, detalles) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error al obtener detalles de cotizacion' });
-      }
+    CotizacionDetalle.findByIdCotizacion(req.params.id, (err, detalles) => {
+      if (err) return res.status(500).json({ error: 'Error al obtener detalles de cotizacion' });
       res.json(detalles);
     });
   },
 
   getResumen: (req, res) => {
     const { fechaInicio, fechaFin, todas } = req.query;
-    
     const hoy = new Date();
-    
-    let inicio = null;
-    let fin = null;
-    
-    if (todas === 'true' || (!fechaInicio && !fechaFin)) {
-      inicio = null;
-      fin = null;
-    } else {
-      inicio = fechaInicio || `${hoy.getFullYear()}-${hoy.getMonth() + 1}-01`;
-      fin = fechaFin || hoy.toISOString().split('T')[0];
-    }
-    
+    const inicio = todas === 'true' || (!fechaInicio && !fechaFin) ? null : (fechaInicio || `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`);
+    const fin = todas === 'true' || (!fechaInicio && !fechaFin) ? null : (fechaFin || hoy.toISOString().slice(0, 10));
     Cotizacion.getResumenPeriodo(inicio, fin, (err, results) => {
-      if (err) {
-        console.error('Error en getResumen:', err);
-        return res.status(500).json({ error: 'Error al obtener resumen de cotizaciones' });
-      }
-
-      if (results.length === 0) {
-        return res.json({
-          total_cotizaciones: 0,
-          total_cotizado: 0,
-          promedio_cotizacion: 0,
-          pendientes: 0,
-          aprobadas: 0,
-          rechazadas: 0,
-          convertidas: 0
-        });
-      }
-
+      if (err) return res.status(500).json({ error: 'Error al obtener resumen de cotizaciones' });
       res.json(results[0] || {
         total_cotizaciones: 0,
         total_cotizado: 0,
@@ -267,173 +215,89 @@ const CotizacionController = {
     });
   },
 
-  convertirAVenta: (req, res) => {
-    const { id } = req.params;
-    const { metodo_pago } = req.body || {};
+  convertirAVenta: async (req, res) => {
+    const idCotizacion = idValido(req.params.id);
+    const metodoPago = req.body?.metodo_pago || 'efectivo';
+    if (!idCotizacion) return res.status(400).json({ error: 'ID de cotización inválido' });
+    if (!METODOS_PAGO.has(metodoPago)) return res.status(400).json({ error: 'Método de pago inválido' });
 
-    console.log('=== INICIO CONVERTIR COTIZACIÓN A VENTA ===');
-    console.log('ID Cotización:', id);
-    console.log('Método de pago:', metodo_pago);
+    try {
+      const resultado = await connection.withTransaction(async (client) => {
+        const quoteResult = await client.query(
+          'SELECT * FROM cotizaciones WHERE id_cotizacion = $1 FOR UPDATE',
+          [idCotizacion]
+        );
+        if (quoteResult.rowCount === 0) throw crearError('Cotización no encontrada', 404);
+        const quote = quoteResult.rows[0];
+        if (!['pendiente', 'aprobada'].includes(quote.estado)) throw crearError('La cotización no se puede convertir', 409);
+        if (quote.fecha_validez && new Date(`${quote.fecha_validez}T23:59:59`) < new Date()) throw crearError('La cotización está vencida', 409);
+        if (metodoPago === 'credito' && !quote.id_cliente) throw crearError('La cotización no tiene cliente para crédito');
 
-    Cotizacion.findById(id, (err, results) => {
-      if (err) {
-        console.error('Error al buscar cotización:', err);
-        return res.status(500).json({ error: 'Error al buscar cotización', details: err.message });
-      }
+        const detallesResult = await client.query(
+          'SELECT * FROM cotizacion_detalles WHERE id_cotizacion = $1 ORDER BY id_detalle',
+          [idCotizacion]
+        );
+        if (detallesResult.rowCount === 0) throw crearError('La cotización no tiene productos');
 
-      if (results.length === 0) {
-        console.log('❌ Cotización no encontrada');
-        return res.status(404).json({ error: 'Cotización no encontrada' });
-      }
-
-      const cotizacion = results[0];
-      console.log('✅ Cotización encontrada:', cotizacion);
-      console.log('Estado de la cotización:', cotizacion.estado);
-
-      if (cotizacion.estado === 'convertida') {
-        console.log('❌ La cotización ya está convertida');
-        return res.status(400).json({ error: 'Esta cotización ya fue convertida en venta' });
-      }
-
-      CotizacionDetalle.findByIdCotizacion(id, (err, detalles) => {
-        if (err) {
-          console.error('Error al obtener detalles:', err);
-          return res.status(500).json({ error: 'Error al obtener detalles de cotización', details: err.message });
+        const productos = [];
+        for (const detalle of detallesResult.rows) {
+          const productResult = await client.query(
+            'SELECT id_producto, nombre, stock_actual FROM productos WHERE id_producto = $1 AND activo = TRUE FOR UPDATE',
+            [detalle.id_producto]
+          );
+          if (productResult.rowCount === 0) throw crearError(`Producto ${detalle.id_producto} no encontrado`);
+          const producto = productResult.rows[0];
+          if (Number(producto.stock_actual) < detalle.cantidad) throw crearError(`Stock insuficiente para ${producto.nombre}`, 409);
+          productos.push({ ...detalle, nombre: producto.nombre });
         }
 
-        console.log('📦 Detalles encontrados:', detalles);
-        console.log('Número de detalles:', detalles ? detalles.length : 0);
+        const brutoCentavos = productos.reduce((sum, detalle) => sum + aCentavos(detalle.precio_unitario) * detalle.cantidad, 0);
+        const descuentoCentavos = aCentavos(quote.descuento || 0);
+        const subtotalFinal = Math.max(brutoCentavos - descuentoCentavos, 0);
+        const ivaCentavos = Math.round(subtotalFinal * 0.16);
+        const totalCentavos = subtotalFinal + ivaCentavos;
+        const esCredito = metodoPago === 'credito';
+        const cajaResult = await client.query(
+          "SELECT id_caja FROM caja WHERE id_usuario = $1 AND estado = 'abierta' ORDER BY fecha_apertura DESC LIMIT 1",
+          [req.user.id_usuario || null]
+        );
+        const idCaja = cajaResult.rows[0]?.id_caja || null;
+        const saleResult = await client.query(
+          `INSERT INTO ventas (id_cliente, id_usuario, id_caja, subtotal, iva, descuento, total, metodo_pago, estado, saldo_pendiente)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           RETURNING id_venta`,
+          [quote.id_cliente, req.user.id_usuario || null, idCaja, subtotalFinal / 100, ivaCentavos / 100, descuentoCentavos / 100, totalCentavos / 100, metodoPago, esCredito ? 'pendiente' : 'completada', esCredito ? totalCentavos / 100 : 0]
+        );
+        const idVenta = saleResult.rows[0].id_venta;
 
-        if (!detalles || detalles.length === 0) {
-          console.log('❌ La cotización no tiene productos');
-          return res.status(400).json({ error: 'La cotización no tiene productos' });
+        for (const detalle of productos) {
+          const subtotal = (aCentavos(detalle.precio_unitario) * detalle.cantidad - aCentavos(detalle.descuento_producto)) / 100;
+          await client.query(
+            `INSERT INTO venta_detalle (id_venta, id_producto, cantidad, precio_unitario, subtotal)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [idVenta, detalle.id_producto, detalle.cantidad, detalle.precio_unitario, subtotal]
+          );
+          const stockResult = await client.query(
+            'UPDATE productos SET stock_actual = stock_actual - $1 WHERE id_producto = $2 AND stock_actual >= $1',
+            [detalle.cantidad, detalle.id_producto]
+          );
+          if (stockResult.rowCount !== 1) throw crearError(`Stock insuficiente para ${detalle.nombre}`, 409);
         }
 
-        const ventaData = {
-          id_cliente: cotizacion.id_cliente,
-          subtotal: cotizacion.subtotal,
-          iva: cotizacion.iva,
-          descuento: cotizacion.descuento,
-          total: cotizacion.total,
-          metodo_pago: metodo_pago || 'efectivo',
-          estado: 'completada'
-        };
-
-        console.log('💰 Datos de venta a crear:', ventaData);
-
-        Venta.create(ventaData, (err, ventaResult) => {
-          if (err) {
-            console.error('❌ Error al crear venta:', err);
-            console.error('Error code:', err.code);
-            console.error('Error message:', err.message);
-            return res.status(500).json({ error: 'Error al crear venta', details: err.message });
-          }
-
-          const idVenta = ventaResult.insertId;
-          console.log('✅ Venta creada con ID:', idVenta);
-
-          const detallePromises = detalles.map(detalle => {
-            return new Promise((resolve, reject) => {
-              console.log('Procesando detalle:', detalle);
-              
-              VentaDetalle.create({
-                id_venta: idVenta,
-                id_producto: detalle.id_producto,
-                cantidad: detalle.cantidad,
-                precio_unitario: detalle.precio_unitario,
-                subtotal: detalle.subtotal
-              }, (err) => {
-                if (err) {
-                  console.error('❌ Error al crear detalle de venta:', err);
-                  return reject(err);
-                }
-
-                Producto.findById(detalle.id_producto, (err, prodResults) => {
-                  if (err) {
-                    console.error('❌ Error al buscar producto:', err);
-                    return reject(err);
-                  }
-                  
-                  if (prodResults.length > 0) {
-                    const producto = prodResults[0];
-                    const stockActual = producto.stock_actual;
-                    const nuevoStock = stockActual - detalle.cantidad;
-                    
-                    console.log(`Producto ${detalle.id_producto}: Stock actual ${stockActual}, Cantidad ${detalle.cantidad}, Nuevo stock ${nuevoStock}`);
-                    
-                    if (nuevoStock < 0) {
-                      console.error('❌ Stock insuficiente para producto', detalle.id_producto);
-                      return reject(new Error(`Stock insuficiente para ${producto.nombre}`));
-                    }
-                    
-                    Producto.updateStock(detalle.id_producto, nuevoStock, (err) => {
-                      if (err) {
-                        console.error('❌ Error al actualizar stock:', err);
-                        return reject(err);
-                      }
-                      console.log(`✅ Stock actualizado para producto ${detalle.id_producto}`);
-                      resolve();
-                    });
-                  } else {
-                    console.log('⚠️ Producto no encontrado, saltando actualización de stock');
-                    resolve();
-                  }
-                });
-              });
-            });
-          });
-
-          Promise.all(detallePromises)
-            .then(() => {
-              console.log('✅ Todos los detalles procesados correctamente');
-              
-              Cotizacion.update(id, { estado: 'convertida' }, (err) => {
-                if (err) {
-                  console.error('⚠️ Error al actualizar estado de cotización:', err);
-                } else {
-                  console.log('✅ Estado de cotización actualizado a convertida');
-                }
-              });
-
-              res.status(201).json({
-                message: 'Cotización convertida a venta exitosamente',
-                id_venta: idVenta,
-                id_cotizacion: id
-              });
-            })
-            .catch(err => {
-              console.error('❌ Error al procesar detalles:', err);
-              res.status(400).json({ error: err.message || 'Error al procesar detalles de venta', details: err.message });
-            });
-        });
+        await client.query(
+          "UPDATE cotizaciones SET estado = 'convertida' WHERE id_cotizacion = $1",
+          [idCotizacion]
+        );
+        return { idVenta, idCotizacion, total: totalCentavos / 100 };
       });
-    });
+
+      registrarAccion(req, 'convertir', 'cotizacion', resultado.idCotizacion, `Venta ${resultado.idVenta}`);
+      res.status(201).json({ message: 'Cotización convertida a venta exitosamente', id_venta: resultado.idVenta, id_cotizacion: resultado.idCotizacion });
+    } catch (error) {
+      const status = error.status || (error.code === '23503' ? 400 : 500);
+      res.status(status).json({ error: status === 500 ? 'Error al convertir cotización' : error.message });
+    }
   }
 };
-
-function CalcularTotales(detalles, callback) {
-  try {
-    let subtotal = 0;
-    
-    detalles.forEach(detalle => {
-      const subtotalItem = parseFloat(detalle.subtotal) || 0;
-      subtotal += subtotalItem;
-    });
-
-    const descuentoGlobal = 0;
-    const subtotalFinal = subtotal - descuentoGlobal;
-    const iva = subtotalFinal * 0.16;
-    const total = subtotalFinal + iva;
-
-    callback(null, {
-      subtotal: subtotalFinal,
-      descuento: descuentoGlobal,
-      iva: iva,
-      total: total
-    });
-  } catch (error) {
-    callback(error);
-  }
-}
 
 module.exports = CotizacionController;
