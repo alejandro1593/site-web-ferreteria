@@ -59,11 +59,13 @@ async function loadProducts() {
     try {
         allProducts = await fetchAPIAuth('/productos');
 
-        document.getElementById('total-products').textContent = allProducts.length;
+        const totalProducts = document.getElementById('total-products');
+        if (totalProducts) totalProducts.textContent = allProducts.length;
         displayProducts(allProducts);
     } catch (error) {
         console.error('Error cargando productos:', error);
-        document.getElementById('loading').innerHTML = '❌ Error cargando productos';
+        const loading = document.getElementById('loading');
+        if (loading) loading.innerHTML = '❌ Error cargando productos';
     }
 }
 

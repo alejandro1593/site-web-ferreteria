@@ -471,13 +471,49 @@ function generateReport(reportData) {
     document.body.removeChild(link);
 }
 
+function setSidebarState(open) {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.querySelector('.sidebar-overlay');
+    const toggle = document.querySelector('.menu-toggle');
+    if (!sidebar) return;
+    sidebar.classList.toggle('show', open);
+    sidebar.classList.toggle('active', open);
+    document.body.classList.toggle('sidebar-open', open);
+    if (overlay) overlay.classList.toggle('visible', open);
+    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+}
+
+function initializeShell() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+    document.body.classList.add('app-shell');
+    let overlay = document.querySelector('.sidebar-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'sidebar-overlay';
+        document.body.appendChild(overlay);
+    }
+    overlay.addEventListener('click', () => setSidebarState(false));
+    document.querySelectorAll('.menu-toggle').forEach(toggle => {
+        toggle.setAttribute('aria-label', 'Abrir menú');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.addEventListener('click', () => setSidebarState(!sidebar.classList.contains('show')));
+    });
+    const currentPath = window.location.pathname.replace(/\.html$/, '') || '/';
+    document.querySelectorAll('.sidebar-nav a').forEach(link => {
+        const linkPath = new URL(link.href).pathname.replace(/\.html$/, '') || '/';
+        const isCurrent = linkPath === currentPath;
+        link.classList.toggle('active', isCurrent);
+        if (isCurrent) link.setAttribute('aria-current', 'page');
+        link.addEventListener('click', () => setSidebarState(false));
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') setSidebarState(false);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ Sistema de Ferretería - Frontend cargado');
     console.log('📦 API_BASE_URL:', API_BASE_URL);
-    
-    document.querySelectorAll('.menu-toggle').forEach(toggle => {
-        toggle.addEventListener('click', () => {
-            document.querySelector('.sidebar').classList.toggle('active');
-        });
-    });
+    initializeShell();
 });
